@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import os
 
 # Crear la aplicación con las carpetas correctas
@@ -26,7 +26,7 @@ login_manager.login_message = 'Por favor inicia sesión para acceder a esta pág
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Usuario.query.get(int(user_id))
+    return db.session.get(Usuario, int(user_id))
 
 # ===== DECORADORES DE PERMISOS =====
 
@@ -57,7 +57,7 @@ class Usuario(UserMixin, db.Model):
     nombre_completo = db.Column(db.String(100), nullable=False)
     rol = db.Column(db.String(20), nullable=False, default='mesero')  # admin, mesero, cocinero
     activo = db.Column(db.Boolean, default=True)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     ultimo_acceso = db.Column(db.DateTime)
     
     def set_password(self, password):
@@ -96,7 +96,7 @@ class Producto(db.Model):
     precio = db.Column(db.Float, nullable=False)
     categoria = db.Column(db.String(50), nullable=False)
     disponible = db.Column(db.Boolean, default=True)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relación con detalles de pedido
     detalles_pedido = db.relationship('DetallePedido', backref='producto', lazy=True)
@@ -125,7 +125,7 @@ class Pedido(db.Model):
     mesa_numero = db.Column(db.String(10))  # Mantener compatibilidad
     estado = db.Column(db.String(20), default='pendiente')
     total = db.Column(db.Float, default=0.0)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     observaciones = db.Column(db.Text)
     
     # Referencias de usuario
@@ -188,7 +188,7 @@ def login():
         
         if usuario and usuario.check_password(password) and usuario.activo:
             login_user(usuario)
-            usuario.ultimo_acceso = datetime.utcnow()
+            usuario.ultimo_acceso = datetime.now(timezone.utc)
             db.session.commit()
             
             next_page = request.args.get('next')
@@ -247,121 +247,222 @@ def register():
 
 # ===== RUTAS DE EMPLEADOS =====
 
-@app.route('/empleados/')
+@app.route('/empleados')
 @login_required
 @requiere_permiso('admin')
 def empleados():
-    """Lista de empleados"""
-    page = request.args.get('page', 1, type=int)
-    empleados = Usuario.query.paginate(page=page, per_page=10, error_out=False)
-    return render_template('empleados/lista.html', empleados=empleados)
-
-@app.route('/empleados/<int:id>')
-@login_required
-@requiere_permiso('admin')
-def ver_empleado(id):
-    """Ver detalles de empleado"""
-    empleado = Usuario.query.get_or_404(id)
-    return render_template('empleados/detalle.html', empleado=empleado)
-
-@app.route('/empleados/<int:id>/editar', methods=['GET', 'POST'])
-@login_required
-@requiere_permiso('admin')
-def editar_empleado(id):
-    """Editar empleado"""
-    empleado = Usuario.query.get_or_404(id)
+    """Gestión de empleados"""
+    # Filtros
+    rol_filtro = request.args.get('rol')
+    buscar = request.args.get('buscar')
     
-    if request.method == 'POST':
-        empleado.nombre_completo = request.form.get('nombre_completo')
-        empleado.email = request.form.get('email')
-        empleado.rol = request.form.get('rol')
-        empleado.activo = 'activo' in request.form
-        
-        # Cambiar contraseña si se proporciona
-        new_password = request.form.get('password')
-        if new_password:
-            empleado.set_password(new_password)
-        
+    # Query base
+    query = Usuario.query
+    
+    # Aplicar filtros
+    if rol_filtro:
+        query = query.filter_by(rol=rol_filtro)
+    if buscar:
+        query = query.filter(
+            (Usuario.nombre_completo.contains(buscar)) | 
+            (Usuario.email.contains(buscar)) | 
+            (Usuario.username.contains(buscar))
+        )
+    
+    usuarios = query.order_by(Usuario.fecha_creacion.desc()).all()
+    
+    # Estadísticas
+    total_usuarios = Usuario.query.count()
+    administradores = Usuario.query.filter_by(rol='admin').count()
+    meseros = Usuario.query.filter_by(rol='mesero').count()
+    cocineros = Usuario.query.filter_by(rol='cocinero').count()
+    
+    stats = {
+        'total_usuarios': total_usuarios,
+        'administradores': administradores,
+        'meseros': meseros,
+        'cocineros': cocineros
+    }
+    
+    return render_template('empleados/index.html', usuarios=usuarios, stats=stats)
+
+@app.route('/empleados/<int:id>/detalle')
+@login_required
+@requiere_permiso('admin')
+def detalle_empleado(id):
+    """Obtener detalles de empleado para modal"""
+    try:
+        empleado = Usuario.query.get_or_404(id)
+        return jsonify({
+            'username': empleado.username,
+            'email': empleado.email,
+            'nombre_completo': empleado.nombre_completo,
+            'rol': empleado.rol,
+            'activo': empleado.activo,
+            'ultimo_acceso': empleado.ultimo_acceso.strftime('%d/%m/%Y %H:%M') if empleado.ultimo_acceso else 'Nunca'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/empleados/<int:id>/toggle-estado', methods=['POST'])
+@login_required
+@requiere_permiso('admin')
+def toggle_estado_empleado(id):
+    """Cambiar estado activo/inactivo del empleado"""
+    try:
+        empleado = Usuario.query.get_or_404(id)
+        data = request.get_json()
+        empleado.activo = data['activo']
         db.session.commit()
-        flash(f'Empleado {empleado.username} actualizado exitosamente', 'success')
-        return redirect(url_for('ver_empleado', id=id))
-    
-    return render_template('empleados/editar.html', empleado=empleado)
+        
+        estado = 'activado' if empleado.activo else 'desactivado'
+        return jsonify({'success': True, 'message': f'Empleado {empleado.username} {estado}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/empleados/<int:id>/toggle')
+@app.route('/empleados/<int:id>/eliminar', methods=['DELETE'])
 @login_required
 @requiere_permiso('admin')
-def toggle_empleado(id):
-    """Activar/desactivar empleado"""
-    empleado = Usuario.query.get_or_404(id)
-    empleado.activo = not empleado.activo
-    db.session.commit()
-    
-    estado = 'activado' if empleado.activo else 'desactivado'
-    flash(f'Empleado {empleado.username} {estado}', 'success')
-    return redirect(url_for('empleados'))
+def eliminar_empleado(id):
+    """Eliminar empleado"""
+    try:
+        empleado = Usuario.query.get_or_404(id)
+        
+        # No permitir eliminar al usuario actual
+        if empleado.id == current_user.id:
+            return jsonify({'success': False, 'message': 'No puedes eliminar tu propia cuenta'})
+        
+        # Verificar si tiene pedidos asociados
+        if empleado.pedidos_tomados or empleado.pedidos_preparados:
+            return jsonify({'success': False, 'message': 'No se puede eliminar un empleado con pedidos asociados'})
+        
+        db.session.delete(empleado)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Empleado eliminado exitosamente'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 # ===== RUTAS DE MESAS =====
 
-@app.route('/mesas/')
+@app.route('/mesas')
 @login_required
 def mesas():
-    """Lista de mesas"""
-    mesas = Mesa.query.filter_by(activa=True).all()
-    return render_template('mesas/lista.html', mesas=mesas)
+    """Gestión de mesas"""
+    # Filtros
+    estado_filtro = request.args.get('estado')
+    capacidad_filtro = request.args.get('capacidad')
+    
+    # Query base
+    query = Mesa.query.filter_by(activa=True)
+    
+    # Aplicar filtros
+    if estado_filtro:
+        query = query.filter_by(estado=estado_filtro)
+    if capacidad_filtro:
+        query = query.filter_by(capacidad=int(capacidad_filtro))
+    
+    mesas = query.order_by(Mesa.numero).all()
+    
+    # Estadísticas
+    total_mesas = Mesa.query.filter_by(activa=True).count()
+    disponibles = Mesa.query.filter_by(estado='disponible', activa=True).count()
+    ocupadas = Mesa.query.filter_by(estado='ocupada', activa=True).count()
+    reservadas = Mesa.query.filter_by(estado='reservada', activa=True).count()
+    
+    # Agregar tiempo ocupada para mesas ocupadas
+    for mesa in mesas:
+        if mesa.estado == 'ocupada' and mesa.pedidos:
+            ultimo_pedido = mesa.pedidos[-1]  # Último pedido
+            tiempo_ocupada = datetime.now(timezone.utc) - ultimo_pedido.fecha
+            horas = int(tiempo_ocupada.total_seconds() // 3600)
+            minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
+            mesa.tiempo_ocupada = f"{horas}h {minutos}m"
+        else:
+            mesa.tiempo_ocupada = "-"
+    
+    stats = {
+        'total_mesas': total_mesas,
+        'disponibles': disponibles,
+        'ocupadas': ocupadas,
+        'reservadas': reservadas
+    }
+    
+    return render_template('mesas/index.html', mesas=mesas, stats=stats)
 
-@app.route('/mesas/nueva', methods=['GET', 'POST'])
+@app.route('/mesas/crear', methods=['POST'])
 @login_required
 @requiere_permiso('admin')
-def nueva_mesa():
+def crear_mesa():
     """Crear nueva mesa"""
-    if request.method == 'POST':
-        numero = request.form.get('numero')
-        capacidad = int(request.form.get('capacidad', 4))
-        ubicacion = request.form.get('ubicacion')
+    try:
+        data = request.get_json()
         
-        # Verificar que no exista mesa con ese número
-        if Mesa.query.filter_by(numero=numero).first():
-            flash('Ya existe una mesa con ese número', 'error')
-            return render_template('mesas/nueva.html')
+        # Verificar que el número no exista
+        if Mesa.query.filter_by(numero=data['numero']).first():
+            return jsonify({'success': False, 'message': 'Ya existe una mesa con ese número'})
         
-        mesa = Mesa(numero=numero, capacidad=capacidad, ubicacion=ubicacion)
+        mesa = Mesa(
+            numero=data['numero'],
+            capacidad=int(data['capacidad']),
+            ubicacion=data['ubicacion'],
+            descripcion=data.get('descripcion', ''),
+            estado='disponible'
+        )
+        
         db.session.add(mesa)
         db.session.commit()
         
-        flash(f'Mesa {numero} creada exitosamente', 'success')
-        return redirect(url_for('mesas'))
-    
-    return render_template('mesas/nueva.html')
+        return jsonify({'success': True, 'message': 'Mesa creada exitosamente'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/mesas/<int:id>/estado', methods=['POST'])
 @login_required
 def cambiar_estado_mesa(id):
     """Cambiar estado de mesa"""
-    mesa = Mesa.query.get_or_404(id)
-    nuevo_estado = request.form.get('estado')
-    
-    if nuevo_estado in ['disponible', 'ocupada', 'reservada']:
+    try:
+        data = request.get_json()
+        mesa = Mesa.query.get_or_404(id)
+        
+        nuevo_estado = data['estado']
+        if nuevo_estado not in ['disponible', 'ocupada', 'reservada']:
+            return jsonify({'success': False, 'message': 'Estado inválido'})
+        
         mesa.estado = nuevo_estado
         db.session.commit()
-        flash(f'Mesa {mesa.numero} marcada como {nuevo_estado}', 'success')
-    
-    return redirect(url_for('mesas'))
+        
+        return jsonify({'success': True, 'message': f'Mesa {mesa.numero} marcada como {nuevo_estado}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/mesas/<int:id>/eliminar', methods=['DELETE'])
+@login_required
+@requiere_permiso('admin')
+def eliminar_mesa(id):
+    """Eliminar mesa"""
+    try:
+        mesa = Mesa.query.get_or_404(id)
+        
+        # Verificar que no tenga pedidos asociados
+        if mesa.pedidos:
+            return jsonify({'success': False, 'message': 'No se puede eliminar una mesa con pedidos asociados'})
+        
+        db.session.delete(mesa)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Mesa eliminada exitosamente'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 # ===== RUTAS DE REPORTES =====
 
-@app.route('/reportes/')
+@app.route('/reportes')
 @login_required
 @requiere_permiso('admin')
 def reportes():
-    """Dashboard de reportes"""
-    return render_template('reportes/dashboard.html')
-
-@app.route('/reportes/ventas')
-@login_required
-@requiere_permiso('admin')
-def reporte_ventas():
-    """Reporte de ventas"""
+    """Dashboard de reportes con análisis completo"""
+    # Período por defecto: último mes
     fecha_inicio = request.args.get('fecha_inicio', date.today().replace(day=1))
     fecha_fin = request.args.get('fecha_fin', date.today())
     
@@ -371,46 +472,128 @@ def reporte_ventas():
     if isinstance(fecha_fin, str):
         fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
     
-    # Consultas de reportes
-    pedidos = Pedido.query.filter(
+    # Consultas básicas
+    pedidos_periodo = Pedido.query.filter(
         Pedido.fecha >= fecha_inicio,
         Pedido.fecha <= fecha_fin
     ).all()
     
-    total_ventas = sum(p.total for p in pedidos)
+    # Métricas principales
+    ventas_totales = sum(p.total for p in pedidos_periodo)
+    total_pedidos = len(pedidos_periodo)
+    ticket_promedio = ventas_totales / total_pedidos if total_pedidos > 0 else 0
+    productos_vendidos = sum(len(p.detalles) for p in pedidos_periodo)
+    productos_unicos = len(set(d.producto_id for p in pedidos_periodo for d in p.detalles))
+    
+    # Calcular variación (simulada - en producción sería vs período anterior)
+    variacion_ventas = 5.2  # Porcentaje simulado
+    promedio_diario = total_pedidos / ((fecha_fin - fecha_inicio).days + 1)
+    
+    metricas = {
+        'ventas_totales': ventas_totales,
+        'total_pedidos': total_pedidos,
+        'ticket_promedio': ticket_promedio,
+        'productos_vendidos': productos_vendidos,
+        'productos_unicos': productos_unicos,
+        'variacion_ventas': variacion_ventas,
+        'promedio_diario': round(promedio_diario, 1)
+    }
+    
+    # Datos para gráficos
+    # Ventas diarias
+    ventas_diarias = {'labels': [], 'data': []}
     pedidos_por_dia = {}
-    
-    for pedido in pedidos:
-        dia = pedido.fecha.date()
+    for pedido in pedidos_periodo:
+        dia = pedido.fecha.strftime('%d/%m')
         if dia not in pedidos_por_dia:
-            pedidos_por_dia[dia] = {'cantidad': 0, 'total': 0}
-        pedidos_por_dia[dia]['cantidad'] += 1
-        pedidos_por_dia[dia]['total'] += pedido.total
+            pedidos_por_dia[dia] = 0
+        pedidos_por_dia[dia] += pedido.total
     
-    return render_template('reportes/ventas.html', 
-                         pedidos=pedidos, 
-                         total_ventas=total_ventas,
-                         pedidos_por_dia=pedidos_por_dia,
-                         fecha_inicio=fecha_inicio,
-                         fecha_fin=fecha_fin)
+    for dia in sorted(pedidos_por_dia.keys()):
+        ventas_diarias['labels'].append(dia)
+        ventas_diarias['data'].append(pedidos_por_dia[dia])
+    
+    # Estados de pedidos
+    estados = {'pendiente': 0, 'preparando': 0, 'listo': 0, 'entregado': 0}
+    for pedido in pedidos_periodo:
+        if pedido.estado in estados:
+            estados[pedido.estado] += 1
+    
+    estados_pedidos = {
+        'labels': ['Pendiente', 'Preparando', 'Listo', 'Entregado'],
+        'data': [estados['pendiente'], estados['preparando'], estados['listo'], estados['entregado']]
+    }
+    
+    # Ventas por hora (simulado)
+    ventasHorarios = {
+        'labels': ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+        'data': [150, 300, 800, 1200, 600, 900, 1100, 700]
+    }
+    
+    # Uso de mesas (simulado)
+    usoMesas = {
+        'labels': ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 4', 'Mesa 5'],
+        'data': [12, 8, 15, 6, 10]
+    }
+    
+    # Top productos
+    from sqlalchemy import func
+    top_productos = db.session.query(
+        Producto.nombre,
+        func.sum(DetallePedido.cantidad).label('cantidad_vendida'),
+        func.sum(DetallePedido.subtotal).label('ingresos_totales')
+    ).join(DetallePedido).join(Pedido).filter(
+        Pedido.fecha >= fecha_inicio,
+        Pedido.fecha <= fecha_fin
+    ).group_by(Producto.id).order_by(
+        func.sum(DetallePedido.cantidad).desc()
+    ).limit(5).all()
+    
+    # Rendimiento por mesero
+    rendimiento_meseros = db.session.query(
+        Usuario.nombre_completo.label('nombre'),
+        func.count(Pedido.id).label('total_pedidos'),
+        func.sum(Pedido.total).label('ventas_totales'),
+        func.avg(Pedido.total).label('ticket_promedio')
+    ).join(Pedido, Usuario.id == Pedido.usuario_id).filter(
+        Pedido.fecha >= fecha_inicio,
+        Pedido.fecha <= fecha_fin,
+        Usuario.rol == 'mesero'
+    ).group_by(Usuario.id).order_by(
+        func.sum(Pedido.total).desc()
+    ).limit(5).all()
+    
+    # Pedidos detallados (últimos 20)
+    pedidos_detallados = Pedido.query.filter(
+        Pedido.fecha >= fecha_inicio,
+        Pedido.fecha <= fecha_fin
+    ).order_by(Pedido.fecha.desc()).limit(20).all()
+    
+    # Fechas por defecto para el template
+    fecha_default = {
+        'inicio': fecha_inicio.strftime('%Y-%m-%d'),
+        'fin': fecha_fin.strftime('%Y-%m-%d')
+    }
+    
+    return render_template('reportes/index.html',
+                         metricas=metricas,
+                         ventas_diarias=ventas_diarias,
+                         estados_pedidos=estados_pedidos,
+                         ventas_horarios=ventasHorarios,
+                         uso_mesas=usoMesas,
+                         top_productos=top_productos,
+                         rendimiento_meseros=rendimiento_meseros,
+                         pedidos_detallados=pedidos_detallados,
+                         fecha_default=fecha_default)
 
-@app.route('/reportes/productos')
+@app.route('/reportes/exportar/<formato>')
 @login_required
 @requiere_permiso('admin')
-def reporte_productos():
-    """Reporte de productos más vendidos"""
-    # Consulta para productos más vendidos
-    from sqlalchemy import func
-    
-    productos_vendidos = db.session.query(
-        Producto.nombre,
-        func.sum(DetallePedido.cantidad).label('total_vendido'),
-        func.sum(DetallePedido.subtotal).label('ingresos')
-    ).join(DetallePedido).group_by(Producto.id).order_by(
-        func.sum(DetallePedido.cantidad).desc()
-    ).limit(10).all()
-    
-    return render_template('reportes/productos.html', productos_vendidos=productos_vendidos)
+def exportar_reporte(formato):
+    """Exportar reportes en Excel o PDF"""
+    # Por ahora retornamos un mensaje, en producción se implementaría la exportación real
+    flash(f'Función de exportar a {formato.upper()} en desarrollo', 'info')
+    return redirect(url_for('reportes'))
 
 # ===== RUTAS PRINCIPALES =====
 
@@ -497,7 +680,7 @@ def nuevo_pedido():
             
             for i, producto_id in enumerate(productos_ids):
                 if producto_id and cantidades[i]:
-                    producto = Producto.query.get(int(producto_id))
+                    producto = db.session.get(Producto, int(producto_id))
                     cantidad = int(cantidades[i])
                     
                     if producto and cantidad > 0:

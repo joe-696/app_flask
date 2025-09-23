@@ -64,11 +64,11 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('nuevo_pedido') }}">Nuevo Pedido</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('pedidos') }}">Ver Todos</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos') }}">Ver Todos</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('pedidos', estado='pendiente') }}">Pendientes</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('pedidos', estado='preparando') }}">Preparando</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('pedidos', estado='listo') }}">Listos</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='pendiente') }}">Pendientes</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='preparando') }}">Preparando</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='listo') }}">Listos</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -77,7 +77,7 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('nuevo_producto') }}">Nuevo Producto</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('productos') }}">Ver Todos</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_productos') }}">Ver Todos</a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
@@ -91,10 +91,10 @@
                             <i class="bi bi-gear"></i> Administración
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('empleados') }}">
+                            <li><a class="dropdown-item" href="#" onclick="alert('Módulo en desarrollo')">
                                 <i class="bi bi-people"></i> Empleados
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('reportes') }}">
+                            <li><a class="dropdown-item" href="#" onclick="alert('Módulo en desarrollo')">
                                 <i class="bi bi-bar-chart"></i> Reportes
                             </a></li>
                         </ul>
