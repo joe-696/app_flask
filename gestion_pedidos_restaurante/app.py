@@ -404,5 +404,14 @@ if __name__ == '__main__':
         db.create_all()
         crear_datos_iniciales()
     
-    print("Servidor iniciado en http://127.0.0.1:5000")
-    app.run(debug=True)
+    # Configuración para despliegue en producción
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    if debug:
+        print("Servidor iniciado en http://127.0.0.1:5000")
+        app.run(host='127.0.0.1', port=5000, debug=True)
+    else:
+        print(f"Servidor iniciado en producción en puerto {port}")
+        app.run(host='0.0.0.0', port=port, debug=False)

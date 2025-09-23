@@ -70,7 +70,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="mb-0">Total: $<span id="total-pedido">0</span></h4>
+                            <h4 class="mb-0">Total: S/<span id="total-pedido">0.00</span></h4>
                         </div>
                         <div>
                             <a href="{{ url_for('lista_pedidos') }}" class="btn btn-secondary me-2">
@@ -108,7 +108,7 @@ function agregarFilaProducto() {
                 <label class="form-label">Producto *</label>
                 <select class="form-control producto-select" name="producto_id" required onchange="actualizarPrecio(this)">
                     <option value="">Seleccionar producto...</option>
-                    ${productos.map(p => `<option value="${p.id}" data-precio="${p.precio}">${p.nombre} - $${p.precio.toLocaleString()}</option>`).join('')}
+                    ${productos.map(p => `<option value="${p.id}" data-precio="${p.precio}">${p.nombre} - S/${p.precio.toLocaleString()}</option>`).join('')}
                 </select>
             </div>
             <div class="col-md-3 mb-2">
@@ -150,7 +150,7 @@ function actualizarPrecio(select) {
     const precioInput = fila.querySelector('.precio-display');
     
     if (precio) {
-        precioInput.value = '$' + parseFloat(precio).toLocaleString();
+        precioInput.value = 'S/' + parseFloat(precio).toFixed(2);
     } else {
         precioInput.value = '';
     }
@@ -173,7 +173,7 @@ function calcularTotal() {
         }
     });
     
-    document.getElementById('total-pedido').textContent = total.toLocaleString();
+    document.getElementById('total-pedido').textContent = total.toFixed(2);
 }
 
 // Event listeners

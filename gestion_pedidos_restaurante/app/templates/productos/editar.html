@@ -37,11 +37,11 @@
                         <div class="col-md-6 mb-3">
                             <label for="precio" class="form-label">Precio *</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">S/</span>
                                 <input type="number" class="form-control" id="precio" name="precio" 
-                                       min="0" step="100" required value="{{ producto.precio|int }}" placeholder="0">
+                                       min="0" step="0.50" required value="{{ '%.2f'|format(producto.precio) }}" placeholder="0.00">
                             </div>
-                            <small class="form-text text-muted">Precio en pesos colombianos</small>
+                            <small class="form-text text-muted">Precio en soles peruanos</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">

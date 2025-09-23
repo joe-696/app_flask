@@ -36,7 +36,7 @@
                             <div class="mt-auto">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="h4 text-success mb-0">
-                                        ${{ "{:,.0f}".format(producto.precio) }}
+                                        S/{{ "{:,.2f}".format(producto.precio) }}
                                     </span>
                                     {% if producto.disponible %}
                                         <span class="badge bg-success">

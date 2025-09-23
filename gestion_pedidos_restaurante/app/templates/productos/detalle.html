@@ -55,7 +55,7 @@
                         <strong>Precio:</strong>
                     </div>
                     <div class="col-sm-8">
-                        <span class="h4 text-success">${{ "{:,.0f}".format(producto.precio) }}</span>
+                        <span class="h4 text-success">S/{{ "{:,.2f}".format(producto.precio) }}</span>
                     </div>
                 </div>
                 <hr>
@@ -198,8 +198,8 @@
                                 <td>
                                     <span class="badge bg-primary">{{ detalle.cantidad }}</span>
                                 </td>
-                                <td>${{ "{:,.0f}".format(detalle.precio_unitario) }}</td>
-                                <td><strong>${{ "{:,.0f}".format(detalle.subtotal) }}</strong></td>
+                                <td>S/{{ "{:,.2f}".format(detalle.precio_unitario) }}</td>
+                                <td><strong>S/{{ "{:,.2f}".format(detalle.subtotal) }}</strong></td>
                                 <td>
                                     <small>{{ detalle.pedido.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
                                 </td>

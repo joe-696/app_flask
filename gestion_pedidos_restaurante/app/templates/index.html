@@ -136,7 +136,7 @@
                                 </span>
                             {% endif %}
                         </td>
-                        <td><strong>${{ "{:,.0f}".format(pedido.total) }}</strong></td>
+                        <td><strong>S/{{ "{:,.2f}".format(pedido.total) }}</strong></td>
                         <td>{{ pedido.fecha.strftime('%d/%m %H:%M') }}</td>
                         <td>
                             <a href="{{ url_for('ver_pedido', id=pedido.id) }}" 

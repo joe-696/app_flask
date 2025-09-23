@@ -115,7 +115,7 @@
                                 </span>
                             {% endif %}
                         </td>
-                        <td><strong>${{ "{:,.0f}".format(pedido.total) }}</strong></td>
+                        <td><strong>S/{{ "{:,.2f}".format(pedido.total) }}</strong></td>
                         <td>
                             <small>
                                 {{ pedido.fecha.strftime('%d/%m/%Y') }}<br>
