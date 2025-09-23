@@ -48,11 +48,15 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% if current_user.is_authenticated %}
                 <ul class="navbar-nav me-auto">
+                    <!-- Navegación común para todos -->
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="bi bi-house"></i> Inicio
                         </a>
                     </li>
+                    
+                    {% if current_user.rol == 'admin' %}
+                    <!-- Menú completo para administradores -->
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('menu') }}">
                             <i class="bi bi-card-list"></i> Menú
@@ -85,7 +89,6 @@
                             <i class="bi bi-grid-3x3"></i> Mesas
                         </a>
                     </li>
-                    {% if current_user.rol == 'admin' %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-gear"></i> Administración
@@ -98,6 +101,70 @@
                                 <i class="bi bi-bar-chart"></i> Reportes
                             </a></li>
                         </ul>
+                    </li>
+                    
+                    {% elif current_user.rol == 'mesero' %}
+                    <!-- Menú específico para meseros -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('menu') }}">
+                            <i class="bi bi-card-list"></i> Menú
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-receipt"></i> Pedidos
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('nuevo_pedido') }}">
+                                <i class="bi bi-plus-circle"></i> Nuevo Pedido
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos') }}">
+                                <i class="bi bi-list-ul"></i> Mis Pedidos
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='pendiente') }}">
+                                <i class="bi bi-clock"></i> Pendientes
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='listo') }}">
+                                <i class="bi bi-check-circle"></i> Listos para servir
+                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('mesas') }}">
+                            <i class="bi bi-grid-3x3"></i> Mesas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('lista_productos') }}">
+                            <i class="bi bi-box"></i> Productos
+                        </a>
+                    </li>
+                    
+                    {% elif current_user.rol == 'cocinero' %}
+                    <!-- Menú específico para cocineros -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-fire"></i> Cocina
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='pendiente') }}">
+                                <i class="bi bi-clock-history"></i> Pedidos Pendientes
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='preparando') }}">
+                                <i class="bi bi-arrow-repeat"></i> En Preparación
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('lista_pedidos', estado='listo') }}">
+                                <i class="bi bi-check-circle"></i> Listos
+                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('lista_productos') }}">
+                            <i class="bi bi-card-list"></i> Menú
+                        </a>
+                    </li>
+                    {% endif %}
                     </li>
                     {% endif %}
                 </ul>

@@ -386,7 +386,12 @@ def editar_empleado(id):
 @app.route('/mesas')
 @login_required
 def mesas():
-    """Gestión de mesas"""
+    """Gestión de mesas (no disponible para cocineros)"""
+    # Los cocineros no tienen acceso a gestión de mesas
+    if current_user.rol == 'cocinero':
+        flash('No tienes permisos para acceder a la gestión de mesas', 'error')
+        return redirect(url_for('index'))
+        
     # Filtros
     estado_filtro = request.args.get('estado')
     capacidad_filtro = request.args.get('capacidad')
@@ -420,7 +425,13 @@ def mesas():
             
             if pedido_actual:
                 mesa.pedido_actual = pedido_actual
-                tiempo_ocupada = datetime.now(timezone.utc) - pedido_actual.fecha
+                # Asegurar que ambos datetimes tengan la misma zona horaria
+                ahora = datetime.now(timezone.utc)
+                fecha_pedido = pedido_actual.fecha
+                if fecha_pedido.tzinfo is None:
+                    fecha_pedido = fecha_pedido.replace(tzinfo=timezone.utc)
+                
+                tiempo_ocupada = ahora - fecha_pedido
                 horas = int(tiempo_ocupada.total_seconds() // 3600)
                 minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
                 mesa.tiempo_ocupada = f"{horas}h {minutos}m"
@@ -892,7 +903,10 @@ def generar_reporte_pdf():
 @app.route('/')
 @login_required
 def index():
-    """Página principal del restaurante"""
+    """Página principal del restaurante - adaptada según rol"""
+    if current_user.rol == 'cocinero':
+        return redirect(url_for('dashboard_cocinero'))
+    
     total_pedidos = Pedido.query.count()
     total_productos = Producto.query.count()
     total_usuarios = Usuario.query.filter_by(activo=True).count()
@@ -905,7 +919,11 @@ def index():
         Pedido.fecha < hoy.replace(day=hoy.day + 1) if hoy.day < 28 else hoy.replace(month=hoy.month + 1, day=1)
     ).count()
     
-    pedidos_recientes = Pedido.query.order_by(Pedido.fecha.desc()).limit(5).all()
+    # Pedidos recientes según el rol
+    if current_user.rol == 'mesero':
+        pedidos_recientes = Pedido.query.filter_by(usuario_id=current_user.id).order_by(Pedido.fecha.desc()).limit(5).all()
+    else:
+        pedidos_recientes = Pedido.query.order_by(Pedido.fecha.desc()).limit(5).all()
     
     return render_template('index.html', 
                          total_pedidos=total_pedidos,
@@ -914,6 +932,36 @@ def index():
                          total_mesas=total_mesas,
                          pedidos_hoy=pedidos_hoy,
                          pedidos_recientes=pedidos_recientes)
+
+@app.route('/dashboard/cocinero')
+@login_required
+def dashboard_cocinero():
+    """Dashboard específico para cocineros"""
+    if current_user.rol != 'cocinero':
+        flash('Acceso denegado', 'error')
+        return redirect(url_for('index'))
+    
+    # Estadísticas para cocineros
+    pendientes = Pedido.query.filter_by(estado='pendiente').count()
+    preparando = Pedido.query.filter_by(estado='preparando').count()
+    listos = Pedido.query.filter_by(estado='listo').count()
+    
+    # Pedidos pendientes más antiguos (prioritarios)
+    pedidos_pendientes = Pedido.query.filter_by(estado='pendiente').order_by(Pedido.fecha.asc()).limit(10).all()
+    
+    # Pedidos en preparación asignados al cocinero actual
+    mis_preparando = Pedido.query.filter_by(estado='preparando', cocinero_id=current_user.id).order_by(Pedido.fecha.asc()).all()
+    
+    # Pedidos listos para servir
+    pedidos_listos = Pedido.query.filter_by(estado='listo').order_by(Pedido.fecha.desc()).limit(5).all()
+    
+    return render_template('dashboard_cocinero.html',
+                         pendientes=pendientes,
+                         preparando=preparando,
+                         listos=listos,
+                         pedidos_pendientes=pedidos_pendientes,
+                         mis_preparando=mis_preparando,
+                         pedidos_listos=pedidos_listos)
 
 @app.route('/menu')
 def menu():
@@ -926,16 +974,28 @@ def menu():
 @app.route('/pedidos/')
 @login_required
 def lista_pedidos():
-    """Mostrar lista de todos los pedidos"""
+    """Mostrar lista de pedidos según el rol del usuario"""
     page = request.args.get('page', 1, type=int)
     estado = request.args.get('estado', 'todos')
     
-    if estado == 'todos':
-        pedidos = Pedido.query.order_by(Pedido.fecha.desc()).paginate(
-            page=page, per_page=10, error_out=False)
-    else:
-        pedidos = Pedido.query.filter_by(estado=estado).order_by(
-            Pedido.fecha.desc()).paginate(page=page, per_page=10, error_out=False)
+    # Query base
+    query = Pedido.query
+    
+    # Filtrar según el rol
+    if current_user.rol == 'mesero':
+        # Los meseros solo ven sus propios pedidos
+        query = query.filter_by(usuario_id=current_user.id)
+    elif current_user.rol == 'cocinero':
+        # Los cocineros ven solo pedidos en estados relevantes para cocina
+        query = query.filter(Pedido.estado.in_(['pendiente', 'preparando', 'listo']))
+    # Los admin ven todos los pedidos (sin filtro adicional)
+    
+    # Aplicar filtro de estado
+    if estado != 'todos':
+        query = query.filter_by(estado=estado)
+    
+    pedidos = query.order_by(Pedido.fecha.desc()).paginate(
+        page=page, per_page=10, error_out=False)
     
     return render_template('pedidos/lista.html', pedidos=pedidos, estado_filtro=estado)
 
@@ -1041,6 +1101,10 @@ def cambiar_estado(id):
             estado_anterior = pedido.estado
             pedido.estado = nuevo_estado
             
+            # Si un cocinero toma un pedido (pasa a preparando), asignarlo
+            if nuevo_estado == 'preparando' and current_user.rol == 'cocinero':
+                pedido.cocinero_id = current_user.id
+            
             # Si el pedido se entrega o cancela, liberar la mesa
             if nuevo_estado in ['entregado', 'cancelado'] and pedido.mesa_info:
                 pedido.mesa_info.estado = 'disponible'
@@ -1049,12 +1113,21 @@ def cambiar_estado(id):
                 flash(f'Estado del pedido #{pedido.id} cambiado a {nuevo_estado}', 'success')
                 
             db.session.commit()
+            
+            # Si es una petición AJAX (desde dashboard cocinero), devolver JSON
+            if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+                return jsonify({'success': True, 'message': f'Estado cambiado a {nuevo_estado}'})
+                
         else:
             flash('Estado no válido', 'error')
+            if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+                return jsonify({'success': False, 'message': 'Estado no válido'})
             
     except Exception as e:
         db.session.rollback()
         flash(f'Error al cambiar estado: {str(e)}', 'error')
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'message': str(e)})
     
     return redirect(url_for('ver_pedido', id=id))
 

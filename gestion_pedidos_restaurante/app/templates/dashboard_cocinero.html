@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Cocina - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-fire text-danger"></i> Dashboard de Cocina
+        </h1>
+        <p class="text-muted">Bienvenido {{ current_user.nombre_completo }}</p>
+    </div>
+</div>
+
+<!-- Estadísticas Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h2 class="card-title">{{ pendientes }}</h2>
+                <p class="card-text">
+                    <i class="bi bi-clock-history"></i> Pedidos Pendientes
+                </p>
+                <a href="{{ url_for('lista_pedidos', estado='pendiente') }}" class="btn btn-light btn-sm">
+                    Ver Todos
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h2 class="card-title">{{ preparando }}</h2>
+                <p class="card-text">
+                    <i class="bi bi-arrow-repeat"></i> En Preparación
+                </p>
+                <a href="{{ url_for('lista_pedidos', estado='preparando') }}" class="btn btn-light btn-sm">
+                    Mis Pedidos
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h2 class="card-title">{{ listos }}</h2>
+                <p class="card-text">
+                    <i class="bi bi-check-circle"></i> Listos para Servir
+                </p>
+                <a href="{{ url_for('lista_pedidos', estado='listo') }}" class="btn btn-light btn-sm">
+                    Ver Listos
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Pedidos Pendientes (Prioritarios) -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Pedidos Prioritarios
+                </h5>
+                <small>Ordenados por antigüedad - ¡Atender primero!</small>
+            </div>
+            <div class="card-body">
+                {% if pedidos_pendientes %}
+                <div class="list-group list-group-flush">
+                    {% for pedido in pedidos_pendientes %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">
+                                Pedido #{{ pedido.id }} - {{ pedido.cliente_nombre }}
+                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-geo-alt"></i> {{ pedido.mesa or 'Sin mesa' }} | 
+                                <i class="bi bi-clock"></i> {{ pedido.fecha.strftime('%H:%M') }}
+                            </small>
+                            <div class="mt-1">
+                                {% for detalle in pedido.detalles %}
+                                <span class="badge bg-light text-dark me-1">
+                                    {{ detalle.cantidad }}x {{ detalle.producto.nombre }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary btn-sm" onclick="tomarPedido({{ pedido.id }})">
+                                <i class="bi bi-play-circle"></i> Tomar
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle display-6"></i>
+                    <p>¡Excelente! No hay pedidos pendientes</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Mis Pedidos en Preparación -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-workspace"></i> Mis Pedidos en Preparación
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if mis_preparando %}
+                <div class="list-group list-group-flush">
+                    {% for pedido in mis_preparando %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Pedido #{{ pedido.id }} - {{ pedido.cliente_nombre }}</h6>
+                            <small class="text-muted">{{ pedido.fecha.strftime('%H:%M') }}</small>
+                        </div>
+                        <p class="mb-1">
+                            <small class="text-muted">
+                                <i class="bi bi-geo-alt"></i> {{ pedido.mesa or 'Sin mesa' }}
+                            </small>
+                        </p>
+                        <div class="mb-2">
+                            {% for detalle in pedido.detalles %}
+                            <span class="badge bg-secondary me-1">
+                                {{ detalle.cantidad }}x {{ detalle.producto.nombre }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        <button class="btn btn-success btn-sm" onclick="marcarListo({{ pedido.id }})">
+                            <i class="bi bi-check-circle"></i> Marcar como Listo
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox display-6"></i>
+                    <p>No tienes pedidos en preparación</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pedidos Listos Recientemente -->
+{% if pedidos_listos %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle-fill"></i> Pedidos Listos para Servir
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for pedido in pedidos_listos %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">Pedido #{{ pedido.id }}</h6>
+                                <p class="card-text">
+                                    <strong>{{ pedido.cliente_nombre }}</strong><br>
+                                    <small class="text-muted">
+                                        <i class="bi bi-geo-alt"></i> {{ pedido.mesa or 'Sin mesa' }} | 
+                                        <i class="bi bi-clock"></i> {{ pedido.fecha.strftime('%H:%M') }}
+                                    </small>
+                                </p>
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Listo
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function tomarPedido(pedidoId) {
+    if (confirm('¿Confirmas que vas a preparar este pedido?')) {
+        fetch(`/pedidos/${pedidoId}/cambiar_estado`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'estado=preparando'
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al tomar el pedido');
+            }
+        });
+    }
+}
+
+function marcarListo(pedidoId) {
+    if (confirm('¿El pedido está listo para servir?')) {
+        fetch(`/pedidos/${pedidoId}/cambiar_estado`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'estado=listo'
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al marcar como listo');
+            }
+        });
+    }
+}
+
+// Auto-refresh cada 30 segundos para ver nuevos pedidos
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}
