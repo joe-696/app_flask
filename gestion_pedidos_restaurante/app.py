@@ -6,6 +6,8 @@ from functools import wraps
 from datetime import datetime, date, timezone
 import os
 import io
+
+# Importaciones para exportación
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from reportlab.lib import colors
@@ -16,6 +18,12 @@ from reportlab.lib.units import inch
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
+
+# Marcar funcionalidades como disponibles
+EXCEL_AVAILABLE = True
+PDF_AVAILABLE = True
+MATPLOTLIB_AVAILABLE = True
+
 import base64
 
 # Crear la aplicación con las carpetas correctas
@@ -415,32 +423,45 @@ def mesas():
     
     # Agregar información de pedidos actuales para mesas ocupadas
     for mesa in mesas:
-        if mesa.estado == 'ocupada' and mesa.pedidos:
-            # Buscar el pedido activo más reciente (no entregado ni cancelado)
-            pedido_actual = None
-            for pedido in reversed(mesa.pedidos):  # Empezar por el más reciente
-                if pedido.estado not in ['entregado', 'cancelado']:
-                    pedido_actual = pedido
-                    break
-            
-            if pedido_actual:
-                mesa.pedido_actual = pedido_actual
-                # Asegurar que ambos datetimes tengan la misma zona horaria
-                ahora = datetime.now(timezone.utc)
-                fecha_pedido = pedido_actual.fecha
-                if fecha_pedido.tzinfo is None:
-                    fecha_pedido = fecha_pedido.replace(tzinfo=timezone.utc)
+        mesa.pedido_actual = None
+        mesa.tiempo_ocupada = "-"
+        
+        try:
+            if mesa.estado == 'ocupada' and mesa.pedidos:
+                # Buscar el pedido activo más reciente (no entregado ni cancelado)
+                pedido_actual = None
+                for pedido in reversed(mesa.pedidos):  # Empezar por el más reciente
+                    if pedido.estado not in ['entregado', 'cancelado']:
+                        pedido_actual = pedido
+                        break
                 
-                tiempo_ocupada = ahora - fecha_pedido
-                horas = int(tiempo_ocupada.total_seconds() // 3600)
-                minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
-                mesa.tiempo_ocupada = f"{horas}h {minutos}m"
-            else:
-                mesa.pedido_actual = None
-                mesa.tiempo_ocupada = "-"
-        else:
+                if pedido_actual:
+                    mesa.pedido_actual = pedido_actual
+                    
+                    # Cálculo de tiempo con manejo de errores robusto
+                    try:
+                        ahora = datetime.now()
+                        fecha_pedido = pedido_actual.fecha
+                        
+                        # Normalizar fechas - remover timezone si existe para evitar conflictos
+                        if hasattr(ahora, 'tzinfo') and ahora.tzinfo:
+                            ahora = ahora.replace(tzinfo=None)
+                        if hasattr(fecha_pedido, 'tzinfo') and fecha_pedido.tzinfo:
+                            fecha_pedido = fecha_pedido.replace(tzinfo=None)
+                        
+                        tiempo_ocupada = ahora - fecha_pedido
+                        horas = int(tiempo_ocupada.total_seconds() // 3600)
+                        minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
+                        mesa.tiempo_ocupada = f"{horas}h {minutos}m"
+                    except Exception as e:
+                        # Si falla el cálculo de tiempo, usar valor por defecto
+                        mesa.tiempo_ocupada = "N/A"
+                        print(f"Error calculando tiempo para mesa {mesa.numero}: {e}")
+        except Exception as e:
+            # Si falla cualquier cosa, continuar con valores por defecto
             mesa.pedido_actual = None
             mesa.tiempo_ocupada = "-"
+            print(f"Error procesando mesa {mesa.numero}: {e}")
     
     stats = {
         'total_mesas': total_mesas,
@@ -707,8 +728,14 @@ def exportar_reporte(formato):
     """Exportar reportes en Excel o PDF"""
     try:
         if formato.lower() == 'excel':
+            if not EXCEL_AVAILABLE:
+                flash('La funcionalidad de exportación a Excel no está disponible. Instale openpyxl.', 'error')
+                return redirect(url_for('reportes'))
             return generar_reporte_excel()
         elif formato.lower() == 'pdf':
+            if not PDF_AVAILABLE:
+                flash('La funcionalidad de exportación a PDF no está disponible. Instale reportlab.', 'error')
+                return redirect(url_for('reportes'))
             return generar_reporte_pdf()
         else:
             flash('Formato no válido', 'error')
@@ -719,6 +746,9 @@ def exportar_reporte(formato):
 
 def generar_reporte_excel():
     """Generar reporte en Excel con múltiples hojas"""
+    if not EXCEL_AVAILABLE:
+        raise Exception("Openpyxl no está disponible")
+        
     wb = Workbook()
     
     # Estilos
@@ -810,6 +840,9 @@ def generar_reporte_excel():
 
 def generar_reporte_pdf():
     """Generar reporte en PDF con tablas y estadísticas"""
+    if not PDF_AVAILABLE:
+        raise Exception("Reportlab no está disponible")
+        
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
