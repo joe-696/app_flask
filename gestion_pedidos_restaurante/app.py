@@ -1,10 +1,22 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime, date, timezone
 import os
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import base64
 
 # Crear la aplicación con las carpetas correctas
 app = Flask(__name__, template_folder='app/templates', static_folder='app/static')
@@ -493,6 +505,50 @@ def eliminar_mesa(id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/mesas/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+@requiere_permiso('admin')
+def editar_mesa(id):
+    """Editar información de una mesa"""
+    mesa = Mesa.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            nuevo_numero = request.form.get('numero')
+            nueva_capacidad = int(request.form.get('capacidad'))
+            nueva_ubicacion = request.form.get('ubicacion')
+            
+            # Validar que el número no esté en uso por otra mesa
+            if nuevo_numero != mesa.numero:
+                mesa_existente = Mesa.query.filter_by(numero=nuevo_numero, activa=True).first()
+                if mesa_existente:
+                    return jsonify({'success': False, 'message': f'Ya existe una mesa con el número {nuevo_numero}'})
+            
+            # Actualizar datos
+            mesa.numero = nuevo_numero
+            mesa.capacidad = nueva_capacidad
+            mesa.ubicacion = nueva_ubicacion
+            
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': f'Mesa {mesa.numero} actualizada correctamente'})
+            
+        except ValueError:
+            return jsonify({'success': False, 'message': 'La capacidad debe ser un número válido'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Error al actualizar mesa: {str(e)}'})
+    
+    # GET: devolver datos de la mesa para el modal
+    return jsonify({
+        'id': mesa.id,
+        'numero': mesa.numero,
+        'capacidad': mesa.capacidad,
+        'ubicacion': mesa.ubicacion or '',
+        'estado': mesa.estado
+    })
+
 # ===== RUTAS DE REPORTES =====
 
 @app.route('/reportes')
@@ -638,9 +694,198 @@ def reportes():
 @requiere_permiso('admin')
 def exportar_reporte(formato):
     """Exportar reportes en Excel o PDF"""
-    # Por ahora retornamos un mensaje, en producción se implementaría la exportación real
-    flash(f'Función de exportar a {formato.upper()} en desarrollo', 'info')
-    return redirect(url_for('reportes'))
+    try:
+        if formato.lower() == 'excel':
+            return generar_reporte_excel()
+        elif formato.lower() == 'pdf':
+            return generar_reporte_pdf()
+        else:
+            flash('Formato no válido', 'error')
+            return redirect(url_for('reportes'))
+    except Exception as e:
+        flash(f'Error al generar reporte: {str(e)}', 'error')
+        return redirect(url_for('reportes'))
+
+def generar_reporte_excel():
+    """Generar reporte en Excel con múltiples hojas"""
+    wb = Workbook()
+    
+    # Estilos
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center")
+    
+    # Hoja 1: Resumen General
+    ws1 = wb.active
+    ws1.title = "Resumen General"
+    
+    # Headers
+    headers = ["Métrica", "Valor"]
+    for col, header in enumerate(headers, 1):
+        cell = ws1.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+    
+    # Datos generales
+    metricas = [
+        ("Total de Pedidos", Pedido.query.count()),
+        ("Total de Productos", Producto.query.count()),
+        ("Total de Usuarios", Usuario.query.filter_by(activo=True).count()),
+        ("Total de Mesas", Mesa.query.filter_by(activa=True).count()),
+        ("Pedidos Pendientes", Pedido.query.filter_by(estado='pendiente').count()),
+        ("Pedidos Completados", Pedido.query.filter_by(estado='entregado').count()),
+    ]
+    
+    for row, (metrica, valor) in enumerate(metricas, 2):
+        ws1.cell(row=row, column=1, value=metrica)
+        ws1.cell(row=row, column=2, value=valor)
+    
+    # Hoja 2: Pedidos Detallados
+    ws2 = wb.create_sheet("Pedidos")
+    pedidos_headers = ["ID", "Cliente", "Mesa", "Estado", "Total", "Fecha", "Usuario"]
+    
+    for col, header in enumerate(pedidos_headers, 1):
+        cell = ws2.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+    
+    pedidos = Pedido.query.order_by(Pedido.fecha.desc()).limit(100).all()
+    for row, pedido in enumerate(pedidos, 2):
+        ws2.cell(row=row, column=1, value=pedido.id)
+        ws2.cell(row=row, column=2, value=pedido.cliente_nombre)
+        ws2.cell(row=row, column=3, value=pedido.mesa or "Sin mesa")
+        ws2.cell(row=row, column=4, value=pedido.estado.title())
+        ws2.cell(row=row, column=5, value=f"S/ {pedido.total:.2f}")
+        ws2.cell(row=row, column=6, value=pedido.fecha.strftime("%Y-%m-%d %H:%M"))
+        ws2.cell(row=row, column=7, value=pedido.usuario.nombre_completo if pedido.usuario else "N/A")
+    
+    # Hoja 3: Productos
+    ws3 = wb.create_sheet("Productos")
+    productos_headers = ["ID", "Nombre", "Categoría", "Precio", "Estado"]
+    
+    for col, header in enumerate(productos_headers, 1):
+        cell = ws3.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+    
+    productos = Producto.query.all()
+    for row, producto in enumerate(productos, 2):
+        ws3.cell(row=row, column=1, value=producto.id)
+        ws3.cell(row=row, column=2, value=producto.nombre)
+        ws3.cell(row=row, column=3, value=producto.categoria)
+        ws3.cell(row=row, column=4, value=f"S/ {producto.precio:.2f}")
+        ws3.cell(row=row, column=5, value="Disponible" if producto.disponible else "No disponible")
+    
+    # Ajustar ancho de columnas
+    for ws in [ws1, ws2, ws3]:
+        for column_cells in ws.columns:
+            length = max(len(str(cell.value)) for cell in column_cells)
+            ws.column_dimensions[column_cells[0].column_letter].width = min(length + 2, 50)
+    
+    # Guardar en memoria
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f'reporte_restaurante_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+def generar_reporte_pdf():
+    """Generar reporte en PDF con tablas y estadísticas"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Título
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        alignment=1  # Center
+    )
+    story.append(Paragraph("Reporte de Restaurante", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Fecha
+    story.append(Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    # Resumen General
+    story.append(Paragraph("Resumen General", styles['Heading2']))
+    resumen_data = [
+        ['Métrica', 'Valor'],
+        ['Total de Pedidos', str(Pedido.query.count())],
+        ['Total de Productos', str(Producto.query.count())],
+        ['Total de Usuarios', str(Usuario.query.filter_by(activo=True).count())],
+        ['Total de Mesas', str(Mesa.query.filter_by(activa=True).count())],
+        ['Pedidos Pendientes', str(Pedido.query.filter_by(estado='pendiente').count())],
+        ['Pedidos Completados', str(Pedido.query.filter_by(estado='entregado').count())],
+    ]
+    
+    resumen_table = Table(resumen_data)
+    resumen_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(resumen_table)
+    story.append(Spacer(1, 20))
+    
+    # Pedidos Recientes
+    story.append(Paragraph("Últimos 10 Pedidos", styles['Heading2']))
+    pedidos_data = [['ID', 'Cliente', 'Mesa', 'Estado', 'Total', 'Fecha']]
+    
+    pedidos = Pedido.query.order_by(Pedido.fecha.desc()).limit(10).all()
+    for pedido in pedidos:
+        pedidos_data.append([
+            str(pedido.id),
+            pedido.cliente_nombre,
+            pedido.mesa or "Sin mesa",
+            pedido.estado.title(),
+            f"S/ {pedido.total:.2f}",
+            pedido.fecha.strftime('%d/%m %H:%M')
+        ])
+    
+    pedidos_table = Table(pedidos_data)
+    pedidos_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(pedidos_table)
+    
+    # Generar PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'reporte_restaurante_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf',
+        mimetype='application/pdf'
+    )
 
 # ===== RUTAS PRINCIPALES =====
 

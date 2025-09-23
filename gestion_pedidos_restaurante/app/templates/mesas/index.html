@@ -346,6 +346,63 @@
     </div>
 </div>
 
+<!-- Modal Editar Mesa -->
+<div class="modal fade" id="modalEditarMesa" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i> Editar Mesa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarMesa">
+                <div class="modal-body">
+                    <input type="hidden" id="editarMesaId" name="id">
+                    
+                    <div class="mb-3">
+                        <label for="editarNumero" class="form-label">Número de Mesa *</label>
+                        <input type="text" class="form-control" id="editarNumero" name="numero" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editarCapacidad" class="form-label">Capacidad *</label>
+                        <select class="form-control" id="editarCapacidad" name="capacidad" required>
+                            <option value="2">2 personas</option>
+                            <option value="4">4 personas</option>
+                            <option value="6">6 personas</option>
+                            <option value="8">8 personas</option>
+                            <option value="10">10 personas</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editarUbicacion" class="form-label">Ubicación</label>
+                        <select class="form-control" id="editarUbicacion" name="ubicacion">
+                            <option value="">Sin especificar</option>
+                            <option value="Interior">Interior</option>
+                            <option value="Terraza">Terraza</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Bar">Bar</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Nota:</strong> El estado de la mesa se mantiene sin cambios.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Actualizar Mesa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Confirmar Eliminación -->
 <div class="modal fade" id="modalConfirmarEliminar" tabindex="-1">
     <div class="modal-dialog">
@@ -489,6 +546,53 @@ document.getElementById('capacidad_filtro').addEventListener('change', function(
 
 document.getElementById('vista').addEventListener('change', function() {
     this.form.submit();
+});
+
+// Función para editar mesa
+function editarMesa(id) {
+    fetch(`/mesas/${id}/editar`)
+    .then(response => response.json())
+    .then(data => {
+        // Llenar el formulario con los datos
+        document.getElementById('editarMesaId').value = data.id;
+        document.getElementById('editarNumero').value = data.numero;
+        document.getElementById('editarCapacidad').value = data.capacidad;
+        document.getElementById('editarUbicacion').value = data.ubicacion || '';
+        
+        // Mostrar el modal
+        new bootstrap.Modal(document.getElementById('modalEditarMesa')).show();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al cargar los datos de la mesa');
+    });
+}
+
+// Manejar envío del formulario de edición
+document.getElementById('formEditarMesa').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const mesaId = formData.get('id');
+    
+    fetch(`/mesas/${mesaId}/editar`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Cerrar modal y recargar página
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarMesa')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al actualizar la mesa');
+    });
 });
 </script>
 {% endblock %}
