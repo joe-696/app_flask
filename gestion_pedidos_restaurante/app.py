@@ -343,6 +343,32 @@ def eliminar_empleado(id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/empleados/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+@requiere_permiso('admin')
+def editar_empleado(id):
+    """Editar empleado"""
+    empleado = Usuario.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            empleado.nombre_completo = request.form.get('nombre_completo')
+            empleado.email = request.form.get('email')
+            empleado.rol = request.form.get('rol')
+            
+            # Cambiar contraseña si se proporciona
+            new_password = request.form.get('password')
+            if new_password:
+                empleado.set_password(new_password)
+            
+            db.session.commit()
+            flash(f'Empleado {empleado.username} actualizado exitosamente', 'success')
+            return redirect(url_for('empleados'))
+        except Exception as e:
+            flash(f'Error al actualizar empleado: {str(e)}', 'error')
+    
+    return render_template('empleados/editar.html', empleado=empleado)
+
 # ===== RUTAS DE MESAS =====
 
 @app.route('/mesas')
@@ -538,30 +564,36 @@ def reportes():
     
     # Top productos
     from sqlalchemy import func
-    top_productos = db.session.query(
-        Producto.nombre,
-        func.sum(DetallePedido.cantidad).label('cantidad_vendida'),
-        func.sum(DetallePedido.subtotal).label('ingresos_totales')
-    ).join(DetallePedido).join(Pedido).filter(
-        Pedido.fecha >= fecha_inicio,
-        Pedido.fecha <= fecha_fin
-    ).group_by(Producto.id).order_by(
-        func.sum(DetallePedido.cantidad).desc()
-    ).limit(5).all()
+    try:
+        top_productos = db.session.query(
+            Producto.nombre,
+            func.sum(DetallePedido.cantidad).label('cantidad_vendida'),
+            func.sum(DetallePedido.subtotal).label('ingresos_totales')
+        ).join(DetallePedido).join(Pedido).filter(
+            Pedido.fecha >= fecha_inicio,
+            Pedido.fecha <= fecha_fin
+        ).group_by(Producto.id).order_by(
+            func.sum(DetallePedido.cantidad).desc()
+        ).limit(5).all()
+    except:
+        top_productos = []
     
     # Rendimiento por mesero
-    rendimiento_meseros = db.session.query(
-        Usuario.nombre_completo.label('nombre'),
-        func.count(Pedido.id).label('total_pedidos'),
-        func.sum(Pedido.total).label('ventas_totales'),
-        func.avg(Pedido.total).label('ticket_promedio')
-    ).join(Pedido, Usuario.id == Pedido.usuario_id).filter(
-        Pedido.fecha >= fecha_inicio,
-        Pedido.fecha <= fecha_fin,
-        Usuario.rol == 'mesero'
-    ).group_by(Usuario.id).order_by(
-        func.sum(Pedido.total).desc()
-    ).limit(5).all()
+    try:
+        rendimiento_meseros = db.session.query(
+            Usuario.nombre_completo.label('nombre'),
+            func.count(Pedido.id).label('total_pedidos'),
+            func.sum(Pedido.total).label('ventas_totales'),
+            func.avg(Pedido.total).label('ticket_promedio')
+        ).join(Pedido, Usuario.id == Pedido.usuario_id).filter(
+            Pedido.fecha >= fecha_inicio,
+            Pedido.fecha <= fecha_fin,
+            Usuario.rol == 'mesero'
+        ).group_by(Usuario.id).order_by(
+            func.sum(Pedido.total).desc()
+        ).limit(5).all()
+    except:
+        rendimiento_meseros = []
     
     # Pedidos detallados (últimos 20)
     pedidos_detallados = Pedido.query.filter(
@@ -575,12 +607,15 @@ def reportes():
         'fin': fecha_fin.strftime('%Y-%m-%d')
     }
     
+    # Importar json para serializar datos
+    import json
+    
     return render_template('reportes/index.html',
                          metricas=metricas,
-                         ventas_diarias=ventas_diarias,
-                         estados_pedidos=estados_pedidos,
-                         ventas_horarios=ventasHorarios,
-                         uso_mesas=usoMesas,
+                         ventas_diarias=json.dumps(ventas_diarias),
+                         estados_pedidos=json.dumps(estados_pedidos),
+                         ventas_horarios=json.dumps(ventasHorarios),
+                         uso_mesas=json.dumps(usoMesas),
                          top_productos=top_productos,
                          rendimiento_meseros=rendimiento_meseros,
                          pedidos_detallados=pedidos_detallados,

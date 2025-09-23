@@ -195,6 +195,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% if top_productos %}
                             {% for producto in top_productos %}
                             <tr>
                                 <td><span class="badge bg-primary">{{ loop.index }}</span></td>
@@ -205,6 +206,14 @@
                                 <td class="text-success">${{ producto.ingresos_totales | round(2) }}</td>
                             </tr>
                             {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                    No hay datos de productos para el período seleccionado
+                                </td>
+                            </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
@@ -230,6 +239,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% if rendimiento_meseros %}
                             {% for mesero in rendimiento_meseros %}
                             <tr>
                                 <td>{{ mesero.nombre }}</td>
@@ -238,6 +248,14 @@
                                 <td class="text-info">${{ mesero.ticket_promedio | round(2) }}</td>
                             </tr>
                             {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    <i class="bi bi-people display-4 d-block mb-2"></i>
+                                    No hay datos de meseros para el período seleccionado
+                                </td>
+                            </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
@@ -313,10 +331,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Datos para gráficos (pasados desde el backend)
-const ventasDiarias = {{ ventas_diarias | tojsonfilter }};
-const estadosPedidos = {{ estados_pedidos | tojsonfilter }};
-const ventasHorarios = {{ ventas_horarios | tojsonfilter }};
-const usoMesas = {{ uso_mesas | tojsonfilter }};
+const ventasDiarias = {{ ventas_diarias | safe }};
+const estadosPedidos = {{ estados_pedidos | safe }};
+const ventasHorarios = {{ ventas_horarios | safe }};
+const usoMesas = {{ uso_mesas | safe }};
 
 // Gráfico de Ventas Diarias
 const ctxVentasDiarias = document.getElementById('ventasDiariosChart').getContext('2d');
