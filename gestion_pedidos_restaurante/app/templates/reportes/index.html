@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-bar-chart-line text-primary"></i> Reportes y Análisis
+        </h1>
+        <p class="text-muted">Análisis de ventas y rendimiento del restaurante</p>
+    </div>
+    <div class="col-auto">
+        <div class="btn-group" role="group">
+            <button class="btn btn-success" onclick="exportarReporte('excel')">
+                <i class="bi bi-file-earmark-excel"></i> Excel
+            </button>
+            <button class="btn btn-info" onclick="exportarReporte('pdf')">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros de Período -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-calendar-range"></i> Período de Análisis
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" 
+                       value="{{ request.args.get('fecha_inicio', fecha_default.inicio) }}">
+            </div>
+            <div class="col-md-3">
+                <label for="fecha_fin" class="form-label">Fecha Fin</label>
+                <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" 
+                       value="{{ request.args.get('fecha_fin', fecha_default.fin) }}">
+            </div>
+            <div class="col-md-3">
+                <label for="periodo_rapido" class="form-label">Períodos Rápidos</label>
+                <select class="form-control" id="periodo_rapido">
+                    <option value="">Personalizado</option>
+                    <option value="hoy">Hoy</option>
+                    <option value="ayer">Ayer</option>
+                    <option value="semana">Esta Semana</option>
+                    <option value="mes">Este Mes</option>
+                    <option value="trimestre">Este Trimestre</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Actualizar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Métricas Principales -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-dollar display-4"></i>
+                <h3 class="card-title mt-2">${{ metricas.ventas_totales | round(2) }}</h3>
+                <p class="card-text">Ventas Totales</p>
+                <small class="opacity-75">
+                    {% if metricas.variacion_ventas > 0 %}
+                        <i class="bi bi-arrow-up"></i> +{{ metricas.variacion_ventas }}%
+                    {% elif metricas.variacion_ventas < 0 %}
+                        <i class="bi bi-arrow-down"></i> {{ metricas.variacion_ventas }}%
+                    {% else %}
+                        <i class="bi bi-dash"></i> Sin cambios
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <i class="bi bi-receipt display-4"></i>
+                <h3 class="card-title mt-2">{{ metricas.total_pedidos }}</h3>
+                <p class="card-text">Pedidos Totales</p>
+                <small class="opacity-75">
+                    Promedio: {{ metricas.promedio_diario }} por día
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up-arrow display-4"></i>
+                <h3 class="card-title mt-2">${{ metricas.ticket_promedio | round(2) }}</h3>
+                <p class="card-text">Ticket Promedio</p>
+                <small class="opacity-75">
+                    Por pedido
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <i class="bi bi-star-fill display-4"></i>
+                <h3 class="card-title mt-2">{{ metricas.productos_vendidos }}</h3>
+                <p class="card-text">Productos Vendidos</p>
+                <small class="opacity-75">
+                    {{ metricas.productos_unicos }} productos únicos
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up"></i> Ventas por Día
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="ventasDiariosChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart"></i> Estados de Pedidos
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="estadosPedidosChart" width="300" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock"></i> Ventas por Hora
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="ventasHorariosChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-grid-3x3"></i> Uso de Mesas
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="usoMesasChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Productos -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-trophy"></i> Productos Más Vendidos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Ingresos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for producto in top_productos %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ loop.index }}</span></td>
+                                <td>{{ producto.nombre }}</td>
+                                <td>
+                                    <span class="badge bg-success">{{ producto.cantidad_vendida }}</span>
+                                </td>
+                                <td class="text-success">${{ producto.ingresos_totales | round(2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill"></i> Rendimiento por Mesero
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Mesero</th>
+                                <th>Pedidos</th>
+                                <th>Ventas</th>
+                                <th>Promedio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mesero in rendimiento_meseros %}
+                            <tr>
+                                <td>{{ mesero.nombre }}</td>
+                                <td><span class="badge bg-primary">{{ mesero.total_pedidos }}</span></td>
+                                <td class="text-success">${{ mesero.ventas_totales | round(2) }}</td>
+                                <td class="text-info">${{ mesero.ticket_promedio | round(2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Análisis Detallado -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table"></i> Análisis Detallado de Pedidos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Pedido</th>
+                                <th>Mesa</th>
+                                <th>Mesero</th>
+                                <th>Estado</th>
+                                <th>Total</th>
+                                <th>Productos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pedido in pedidos_detallados %}
+                            <tr>
+                                <td>{{ pedido.fecha_hora.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    <a href="{{ url_for('ver_pedido', id=pedido.id) }}" class="text-decoration-none">
+                                        #{{ pedido.id }}
+                                    </a>
+                                </td>
+                                <td>Mesa {{ pedido.mesa.numero }}</td>
+                                <td>{{ pedido.usuario.nombre_completo if pedido.usuario else 'N/A' }}</td>
+                                <td>
+                                    {% if pedido.estado == 'pendiente' %}
+                                        <span class="badge bg-warning">⏳ Pendiente</span>
+                                    {% elif pedido.estado == 'preparando' %}
+                                        <span class="badge bg-info">👨‍🍳 Preparando</span>
+                                    {% elif pedido.estado == 'listo' %}
+                                        <span class="badge bg-primary">✅ Listo</span>
+                                    {% elif pedido.estado == 'entregado' %}
+                                        <span class="badge bg-success">🍽️ Entregado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-success fw-bold">${{ pedido.total | round(2) }}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ pedido.productos|length }} productos
+                                    </small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Datos para gráficos (pasados desde el backend)
+const ventasDiarias = {{ ventas_diarias | tojsonfilter }};
+const estadosPedidos = {{ estados_pedidos | tojsonfilter }};
+const ventasHorarios = {{ ventas_horarios | tojsonfilter }};
+const usoMesas = {{ uso_mesas | tojsonfilter }};
+
+// Gráfico de Ventas Diarias
+const ctxVentasDiarias = document.getElementById('ventasDiariosChart').getContext('2d');
+new Chart(ctxVentasDiarias, {
+    type: 'line',
+    data: {
+        labels: ventasDiarias.labels,
+        datasets: [{
+            label: 'Ventas ($)',
+            data: ventasDiarias.data,
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Estados de Pedidos
+const ctxEstadosPedidos = document.getElementById('estadosPedidosChart').getContext('2d');
+new Chart(ctxEstadosPedidos, {
+    type: 'doughnut',
+    data: {
+        labels: estadosPedidos.labels,
+        datasets: [{
+            data: estadosPedidos.data,
+            backgroundColor: [
+                '#ffc107', // Pendiente
+                '#17a2b8', // Preparando
+                '#007bff', // Listo
+                '#28a745'  // Entregado
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Gráfico de Ventas por Hora
+const ctxVentasHorarios = document.getElementById('ventasHorariosChart').getContext('2d');
+new Chart(ctxVentasHorarios, {
+    type: 'bar',
+    data: {
+        labels: ventasHorarios.labels,
+        datasets: [{
+            label: 'Ventas por Hora',
+            data: ventasHorarios.data,
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Uso de Mesas
+const ctxUsoMesas = document.getElementById('usoMesasChart').getContext('2d');
+new Chart(ctxUsoMesas, {
+    type: 'bar',
+    data: {
+        labels: usoMesas.labels,
+        datasets: [{
+            label: 'Pedidos por Mesa',
+            data: usoMesas.data,
+            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Períodos rápidos
+document.getElementById('periodo_rapido').addEventListener('change', function() {
+    const value = this.value;
+    const fechaInicio = document.getElementById('fecha_inicio');
+    const fechaFin = document.getElementById('fecha_fin');
+    const hoy = new Date();
+    
+    switch(value) {
+        case 'hoy':
+            fechaInicio.value = fechaFin.value = hoy.toISOString().split('T')[0];
+            break;
+        case 'ayer':
+            const ayer = new Date(hoy);
+            ayer.setDate(ayer.getDate() - 1);
+            fechaInicio.value = fechaFin.value = ayer.toISOString().split('T')[0];
+            break;
+        case 'semana':
+            const inicioSemana = new Date(hoy);
+            inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+            fechaInicio.value = inicioSemana.toISOString().split('T')[0];
+            fechaFin.value = hoy.toISOString().split('T')[0];
+            break;
+        case 'mes':
+            fechaInicio.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+            fechaFin.value = hoy.toISOString().split('T')[0];
+            break;
+        case 'trimestre':
+            const inicioTrimestre = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth() / 3) * 3, 1);
+            fechaInicio.value = inicioTrimestre.toISOString().split('T')[0];
+            fechaFin.value = hoy.toISOString().split('T')[0];
+            break;
+    }
+    
+    if (value) {
+        fechaInicio.form.submit();
+    }
+});
+
+// Exportar reportes
+function exportarReporte(formato) {
+    const fechaInicio = document.getElementById('fecha_inicio').value;
+    const fechaFin = document.getElementById('fecha_fin').value;
+    
+    const url = `/reportes/exportar/${formato}?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

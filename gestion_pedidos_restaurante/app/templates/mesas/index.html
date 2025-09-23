@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Mesas - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-grid-3x3 text-primary"></i> Gestión de Mesas
+        </h1>
+        <p class="text-muted">Administrar mesas del restaurante</p>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevaMesa">
+            <i class="bi bi-plus-circle"></i> Nueva Mesa
+        </button>
+    </div>
+</div>
+
+<!-- Estadísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.total_mesas }}</h3>
+                <p class="card-text">Total Mesas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.disponibles }}</h3>
+                <p class="card-text">Disponibles</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.ocupadas }}</h3>
+                <p class="card-text">Ocupadas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-danger">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.reservadas }}</h3>
+                <p class="card-text">Reservadas</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-funnel"></i> Filtros y Vista
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="estado_filtro" class="form-label">Estado</label>
+                <select name="estado" class="form-control" id="estado_filtro">
+                    <option value="">Todos los estados</option>
+                    <option value="disponible" {{ 'selected' if request.args.get('estado') == 'disponible' }}>Disponibles</option>
+                    <option value="ocupada" {{ 'selected' if request.args.get('estado') == 'ocupada' }}>Ocupadas</option>
+                    <option value="reservada" {{ 'selected' if request.args.get('estado') == 'reservada' }}>Reservadas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="capacidad_filtro" class="form-label">Capacidad</label>
+                <select name="capacidad" class="form-control" id="capacidad_filtro">
+                    <option value="">Todas las capacidades</option>
+                    <option value="2" {{ 'selected' if request.args.get('capacidad') == '2' }}>2 personas</option>
+                    <option value="4" {{ 'selected' if request.args.get('capacidad') == '4' }}>4 personas</option>
+                    <option value="6" {{ 'selected' if request.args.get('capacidad') == '6' }}>6 personas</option>
+                    <option value="8" {{ 'selected' if request.args.get('capacidad') == '8' }}>8+ personas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="vista" class="form-label">Vista</label>
+                <select name="vista" class="form-control" id="vista">
+                    <option value="grid" {{ 'selected' if request.args.get('vista', 'grid') == 'grid' }}>Tarjetas</option>
+                    <option value="tabla" {{ 'selected' if request.args.get('vista') == 'tabla' }}>Tabla</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Actualizar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Vista Grid (Tarjetas) -->
+{% if request.args.get('vista', 'grid') == 'grid' %}
+<div class="row">
+    {% for mesa in mesas %}
+    <div class="col-md-4 col-lg-3 mb-4">
+        <div class="card h-100 {{ 'border-success' if mesa.estado == 'disponible' else 'border-warning' if mesa.estado == 'ocupada' else 'border-danger' }}">
+            <div class="card-header text-center 
+                      {{ 'bg-success text-white' if mesa.estado == 'disponible' else 
+                         'bg-warning text-dark' if mesa.estado == 'ocupada' else 
+                         'bg-danger text-white' }}">
+                <h5 class="mb-0">
+                    <i class="bi bi-grid"></i> Mesa {{ mesa.numero }}
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-people display-6 text-muted"></i>
+                </div>
+                <h4 class="text-primary">{{ mesa.capacidad }} personas</h4>
+                <p class="text-muted mb-2">{{ mesa.ubicacion }}</p>
+                
+                {% if mesa.estado == 'disponible' %}
+                    <span class="badge bg-success fs-6">✅ Disponible</span>
+                {% elif mesa.estado == 'ocupada' %}
+                    <span class="badge bg-warning fs-6">🍽️ Ocupada</span>
+                {% elif mesa.estado == 'reservada' %}
+                    <span class="badge bg-danger fs-6">📋 Reservada</span>
+                {% endif %}
+                
+                {% if mesa.pedido_actual %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Pedido #{{ mesa.pedido_actual.id }}<br>
+                        {{ mesa.pedido_actual.fecha_hora.strftime('%H:%M') }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="btn-group w-100" role="group">
+                    {% if mesa.estado == 'disponible' %}
+                        <button class="btn btn-success btn-sm" onclick="cambiarEstado({{ mesa.id }}, 'ocupada')">
+                            <i class="bi bi-person-plus"></i> Ocupar
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="cambiarEstado({{ mesa.id }}, 'reservada')">
+                            <i class="bi bi-bookmark"></i> Reservar
+                        </button>
+                    {% elif mesa.estado == 'ocupada' %}
+                        <button class="btn btn-success btn-sm" onclick="cambiarEstado({{ mesa.id }}, 'disponible')">
+                            <i class="bi bi-check-circle"></i> Liberar
+                        </button>
+                        {% if mesa.pedido_actual %}
+                        <a href="{{ url_for('pedidos') }}?mesa={{ mesa.id }}" class="btn btn-info btn-sm">
+                            <i class="bi bi-eye"></i> Ver Pedido
+                        </a>
+                        {% endif %}
+                    {% elif mesa.estado == 'reservada' %}
+                        <button class="btn btn-success btn-sm" onclick="cambiarEstado({{ mesa.id }}, 'ocupada')">
+                            <i class="bi bi-person-check"></i> Ocupar
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="cambiarEstado({{ mesa.id }}, 'disponible')">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="btn-group w-100 mt-2" role="group">
+                    <button class="btn btn-outline-primary btn-sm" onclick="editarMesa({{ mesa.id }})">
+                        <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="confirmarEliminar({{ mesa.id }}, {{ mesa.numero }})">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Vista Tabla -->
+{% if request.args.get('vista') == 'tabla' %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-table"></i> Lista de Mesas
+            <span class="badge bg-secondary ms-2">{{ mesas|length }} mesas</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if mesas %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Mesa</th>
+                        <th>Capacidad</th>
+                        <th>Ubicación</th>
+                        <th>Estado</th>
+                        <th>Pedido Actual</th>
+                        <th>Tiempo Ocupada</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mesa in mesas %}
+                    <tr class="{{ 'table-success' if mesa.estado == 'disponible' else 'table-warning' if mesa.estado == 'ocupada' else 'table-danger' }}">
+                        <td><strong>Mesa {{ mesa.numero }}</strong></td>
+                        <td>
+                            <i class="bi bi-people"></i> {{ mesa.capacidad }} personas
+                        </td>
+                        <td>{{ mesa.ubicacion }}</td>
+                        <td>
+                            {% if mesa.estado == 'disponible' %}
+                                <span class="badge bg-success">✅ Disponible</span>
+                            {% elif mesa.estado == 'ocupada' %}
+                                <span class="badge bg-warning">🍽️ Ocupada</span>
+                            {% elif mesa.estado == 'reservada' %}
+                                <span class="badge bg-danger">📋 Reservada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if mesa.pedido_actual %}
+                                <a href="{{ url_for('pedidos') }}?mesa={{ mesa.id }}" class="text-decoration-none">
+                                    Pedido #{{ mesa.pedido_actual.id }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if mesa.estado == 'ocupada' and mesa.pedido_actual %}
+                                {{ mesa.tiempo_ocupada }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm" role="group">
+                                {% if mesa.estado == 'disponible' %}
+                                    <button class="btn btn-outline-success" onclick="cambiarEstado({{ mesa.id }}, 'ocupada')" title="Ocupar">
+                                        <i class="bi bi-person-plus"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" onclick="cambiarEstado({{ mesa.id }}, 'reservada')" title="Reservar">
+                                        <i class="bi bi-bookmark"></i>
+                                    </button>
+                                {% elif mesa.estado == 'ocupada' %}
+                                    <button class="btn btn-outline-success" onclick="cambiarEstado({{ mesa.id }}, 'disponible')" title="Liberar">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                {% elif mesa.estado == 'reservada' %}
+                                    <button class="btn btn-outline-success" onclick="cambiarEstado({{ mesa.id }}, 'ocupada')" title="Ocupar">
+                                        <i class="bi bi-person-check"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary" onclick="cambiarEstado({{ mesa.id }}, 'disponible')" title="Cancelar">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                {% endif %}
+                                <button class="btn btn-outline-primary" onclick="editarMesa({{ mesa.id }})" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="confirmarEliminar({{ mesa.id }}, {{ mesa.numero }})" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if not mesas %}
+<div class="text-center py-5">
+    <i class="bi bi-grid-3x3 display-1 text-muted"></i>
+    <h4 class="text-muted mt-3">No hay mesas para mostrar</h4>
+    <p class="text-muted">Las mesas que coincidan con los filtros aparecerán aquí</p>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevaMesa">
+        <i class="bi bi-plus-circle"></i> Crear Primera Mesa
+    </button>
+</div>
+{% endif %}
+
+<!-- Modal Nueva Mesa -->
+<div class="modal fade" id="modalNuevaMesa" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle"></i> Nueva Mesa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNuevaMesa">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="numero" class="form-label">Número de Mesa *</label>
+                        <input type="number" class="form-control" id="numero" name="numero" required min="1" max="999">
+                        <small class="form-text text-muted">Número único para identificar la mesa</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="capacidad" class="form-label">Capacidad *</label>
+                        <select class="form-control" id="capacidad" name="capacidad" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="2">2 personas</option>
+                            <option value="4">4 personas</option>
+                            <option value="6">6 personas</option>
+                            <option value="8">8 personas</option>
+                            <option value="10">10 personas</option>
+                            <option value="12">12 personas</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ubicacion" class="form-label">Ubicación *</label>
+                        <select class="form-control" id="ubicacion" name="ubicacion" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="Terraza">🌞 Terraza</option>
+                            <option value="Interior">🏢 Interior</option>
+                            <option value="Ventana">🪟 Junto a Ventana</option>
+                            <option value="Privado">🔒 Área Privada</option>
+                            <option value="Barra">🍷 Barra</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="2" 
+                                  placeholder="Características especiales de la mesa..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check"></i> Crear Mesa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Eliminación -->
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar la <strong id="mesaAEliminar"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Si la mesa tiene pedidos asociados, no podrá ser eliminada.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarEliminar">
+                    <i class="bi bi-trash"></i> Eliminar Mesa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh cada 30 segundos para estados de mesas
+setInterval(() => {
+    if (document.visibilityState === 'visible') {
+        window.location.reload();
+    }
+}, 30000);
+
+// Crear nueva mesa
+document.getElementById('formNuevaMesa').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/mesas/crear', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al crear la mesa');
+    });
+});
+
+// Cambiar estado de mesa
+function cambiarEstado(mesaId, nuevoEstado) {
+    const estadoTexto = {
+        'disponible': 'disponible',
+        'ocupada': 'ocupada',
+        'reservada': 'reservada'
+    };
+    
+    if (confirm(`¿Cambiar mesa a ${estadoTexto[nuevoEstado]}?`)) {
+        fetch(`/mesas/${mesaId}/estado`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ estado: nuevoEstado })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado de la mesa');
+        });
+    }
+}
+
+// Editar mesa
+function editarMesa(id) {
+    // Por implementar - abrir modal de edición
+    alert('Función de edición en desarrollo');
+}
+
+// Confirmar eliminación
+let mesaAEliminarId = null;
+
+function confirmarEliminar(id, numero) {
+    mesaAEliminarId = id;
+    document.getElementById('mesaAEliminar').textContent = `Mesa ${numero}`;
+    new bootstrap.Modal(document.getElementById('modalConfirmarEliminar')).show();
+}
+
+document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+    if (mesaAEliminarId) {
+        fetch(`/mesas/${mesaAEliminarId}/eliminar`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar la mesa');
+        });
+    }
+});
+
+// Auto-submit de filtros
+document.getElementById('estado_filtro').addEventListener('change', function() {
+    this.form.submit();
+});
+
+document.getElementById('capacidad_filtro').addEventListener('change', function() {
+    this.form.submit();
+});
+
+document.getElementById('vista').addEventListener('change', function() {
+    this.form.submit();
+});
+</script>
+{% endblock %}

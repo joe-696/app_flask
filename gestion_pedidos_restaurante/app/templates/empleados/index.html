@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Empleados - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h1 class="display-6 mb-0">
+            <i class="bi bi-people-fill text-primary"></i> Gestión de Empleados
+        </h1>
+        <p class="text-muted">Administrar usuarios del sistema</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('registrar') }}" class="btn btn-success">
+            <i class="bi bi-person-plus"></i> Nuevo Empleado
+        </a>
+    </div>
+</div>
+
+<!-- Estadísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.total_usuarios }}</h3>
+                <p class="card-text">Total Usuarios</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.administradores }}</h3>
+                <p class="card-text">Administradores</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.meseros }}</h3>
+                <p class="card-text">Meseros</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h3 class="card-title">{{ stats.cocineros }}</h3>
+                <p class="card-text">Cocineros</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-funnel"></i> Filtros
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label for="rol_filtro" class="form-label">Filtrar por Rol</label>
+                <select name="rol" class="form-control" id="rol_filtro">
+                    <option value="">Todos los roles</option>
+                    <option value="admin" {{ 'selected' if request.args.get('rol') == 'admin' }}>Administradores</option>
+                    <option value="mesero" {{ 'selected' if request.args.get('rol') == 'mesero' }}>Meseros</option>
+                    <option value="cocinero" {{ 'selected' if request.args.get('rol') == 'cocinero' }}>Cocineros</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="buscar" class="form-label">Buscar por Nombre/Email</label>
+                <input type="text" class="form-control" id="buscar" name="buscar" 
+                       value="{{ request.args.get('buscar', '') }}" placeholder="Buscar empleado...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Empleados -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-list"></i> Lista de Empleados
+            <span class="badge bg-secondary ms-2">{{ usuarios|length }} empleados</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if usuarios %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Nombre Completo</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Estado</th>
+                        <th>Último Acceso</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>
+                            <strong>{{ usuario.username }}</strong>
+                            {% if usuario.id == current_user.id %}
+                                <span class="badge bg-info">Tú</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ usuario.nombre_completo }}</td>
+                        <td>
+                            <a href="mailto:{{ usuario.email }}">{{ usuario.email }}</a>
+                        </td>
+                        <td>
+                            {% if usuario.rol == 'admin' %}
+                                <span class="badge bg-success">👤 Admin</span>
+                            {% elif usuario.rol == 'mesero' %}
+                                <span class="badge bg-info">🍽️ Mesero</span>
+                            {% elif usuario.rol == 'cocinero' %}
+                                <span class="badge bg-warning">👨‍🍳 Cocinero</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if usuario.activo %}
+                                <span class="badge bg-success">✅ Activo</span>
+                            {% else %}
+                                <span class="badge bg-danger">❌ Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if usuario.ultimo_acceso %}
+                                {{ usuario.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                <span class="text-muted">Nunca</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary" 
+                                        onclick="verEmpleado({{ usuario.id }})" 
+                                        data-bs-toggle="tooltip" title="Ver detalles">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-warning" 
+                                        onclick="editarEmpleado({{ usuario.id }})"
+                                        data-bs-toggle="tooltip" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% if usuario.id != current_user.id %}
+                                <button type="button" class="btn btn-outline-secondary" 
+                                        onclick="toggleEstado({{ usuario.id }}, '{{ usuario.activo }}')"
+                                        data-bs-toggle="tooltip" title="Cambiar estado">
+                                    {% if usuario.activo %}
+                                        <i class="bi bi-pause"></i>
+                                    {% else %}
+                                        <i class="bi bi-play"></i>
+                                    {% endif %}
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="confirmarEliminar({{ usuario.id }}, '{{ usuario.username }}')"
+                                        data-bs-toggle="tooltip" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-people display-1 text-muted"></i>
+            <h4 class="text-muted mt-3">No hay empleados para mostrar</h4>
+            <p class="text-muted">Los empleados que coincidan con los filtros aparecerán aquí</p>
+            <a href="{{ url_for('registrar') }}" class="btn btn-success">
+                <i class="bi bi-person-plus"></i> Crear Primer Empleado
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Ver Empleado -->
+<div class="modal fade" id="modalVerEmpleado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-circle"></i> Detalles del Empleado
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contenidoEmpleado">
+                <!-- Se carga dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmar Eliminación -->
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar al empleado <strong id="nombreEmpleadoEliminar"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Esta acción no se puede deshacer.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarEliminar">
+                    <i class="bi bi-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Inicializar tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+});
+
+// Ver detalles del empleado
+function verEmpleado(id) {
+    fetch(`/empleados/${id}/detalle`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('contenidoEmpleado').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Usuario:</strong><br>
+                        <span class="text-muted">${data.username}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Email:</strong><br>
+                        <span class="text-muted">${data.email}</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Nombre Completo:</strong><br>
+                        <span class="text-muted">${data.nombre_completo}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Rol:</strong><br>
+                        <span class="badge bg-${data.rol === 'admin' ? 'success' : data.rol === 'mesero' ? 'info' : 'warning'}">
+                            ${data.rol === 'admin' ? '👤 Administrador' : data.rol === 'mesero' ? '🍽️ Mesero' : '👨‍🍳 Cocinero'}
+                        </span>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Estado:</strong><br>
+                        <span class="badge bg-${data.activo ? 'success' : 'danger'}">
+                            ${data.activo ? '✅ Activo' : '❌ Inactivo'}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Último Acceso:</strong><br>
+                        <span class="text-muted">${data.ultimo_acceso || 'Nunca'}</span>
+                    </div>
+                </div>
+            `;
+            new bootstrap.Modal(document.getElementById('modalVerEmpleado')).show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar los detalles del empleado');
+        });
+}
+
+// Editar empleado
+function editarEmpleado(id) {
+    window.location.href = `/empleados/${id}/editar`;
+}
+
+// Toggle estado del empleado
+function toggleEstado(id, estadoActual) {
+    const nuevoEstado = estadoActual === 'True' ? false : true;
+    const accion = nuevoEstado ? 'activar' : 'desactivar';
+    
+    if (confirm(`¿Deseas ${accion} este empleado?`)) {
+        fetch(`/empleados/${id}/toggle-estado`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ activo: nuevoEstado })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado del empleado');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado del empleado');
+        });
+    }
+}
+
+// Confirmar eliminación
+let empleadoAEliminar = null;
+
+function confirmarEliminar(id, username) {
+    empleadoAEliminar = id;
+    document.getElementById('nombreEmpleadoEliminar').textContent = username;
+    new bootstrap.Modal(document.getElementById('modalConfirmarEliminar')).show();
+}
+
+document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+    if (empleadoAEliminar) {
+        fetch(`/empleados/${empleadoAEliminar}/eliminar`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el empleado');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar el empleado');
+        });
+    }
+});
+
+// Auto-submit del formulario de búsqueda con delay
+let searchTimeout;
+document.getElementById('buscar').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        this.form.submit();
+    }, 500);
+});
+</script>
+{% endblock %}

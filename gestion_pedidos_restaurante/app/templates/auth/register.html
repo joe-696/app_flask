@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Usuario - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-6 mb-4">
+            <i class="bi bi-person-plus text-success"></i> Registrar Nuevo Usuario
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-badge"></i> Información del Usuario
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="username" class="form-label">Nombre de Usuario *</label>
+                            <input type="text" class="form-control" id="username" name="username" 
+                                   required placeholder="ej: jperez">
+                            <small class="form-text text-muted">Sin espacios, solo letras, números y guiones</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   required placeholder="usuario@restaurante.com">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="nombre_completo" class="form-label">Nombre Completo *</label>
+                            <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" 
+                                   required placeholder="Juan Pérez García">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="rol" class="form-label">Rol *</label>
+                            <select class="form-control" id="rol" name="rol" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="admin">👤 Administrador</option>
+                                <option value="mesero">🍽️ Mesero</option>
+                                <option value="cocinero">👨‍🍳 Cocinero</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">Contraseña *</label>
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   required minlength="6" placeholder="Mínimo 6 caracteres">
+                            <small class="form-text text-muted">Mínimo 6 caracteres</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="password_confirm" class="form-label">Confirmar Contraseña *</label>
+                            <input type="password" class="form-control" id="password_confirm" name="password_confirm" 
+                                   required placeholder="Repetir contraseña">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="card bg-light">
+                            <div class="card-body p-3">
+                                <h6 class="card-title">Permisos por Rol:</h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <strong>👤 Administrador:</strong>
+                                        <ul class="small mb-0 mt-1">
+                                            <li>Acceso total</li>
+                                            <li>Gestión de usuarios</li>
+                                            <li>Reportes</li>
+                                            <li>Configuración</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>🍽️ Mesero:</strong>
+                                        <ul class="small mb-0 mt-1">
+                                            <li>Tomar pedidos</li>
+                                            <li>Cambiar estados</li>
+                                            <li>Ver productos</li>
+                                            <li>Gestionar mesas</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>👨‍🍳 Cocinero:</strong>
+                                        <ul class="small mb-0 mt-1">
+                                            <li>Ver pedidos</li>
+                                            <li>Cambiar a "preparando"</li>
+                                            <li>Marcar como "listo"</li>
+                                            <li>Ver productos</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('empleados') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Volver a Empleados
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-person-check"></i> Crear Usuario
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Validar que las contraseñas coincidan
+document.getElementById('password_confirm').addEventListener('input', function() {
+    const password = document.getElementById('password').value;
+    const confirmPassword = this.value;
+    
+    if (password !== confirmPassword) {
+        this.setCustomValidity('Las contraseñas no coinciden');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+
+// Mostrar/ocultar información de roles
+document.getElementById('rol').addEventListener('change', function() {
+    const roleInfo = document.querySelector('.card.bg-light');
+    if (this.value) {
+        roleInfo.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}
