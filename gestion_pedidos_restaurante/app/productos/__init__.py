@@ -1,0 +1,1 @@
+# Archivo vacío para hacer que la carpeta productos sea un paquete de Python

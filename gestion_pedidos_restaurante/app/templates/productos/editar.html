@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Editar {{ producto.nombre }} - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-6 mb-4">
+            <i class="bi bi-pencil text-warning"></i> Editar Producto
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-box"></i> {{ producto.nombre }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Producto *</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" required
+                               value="{{ producto.nombre }}" placeholder="Ej: Hamburguesa Clásica">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"
+                                placeholder="Describe los ingredientes y características del producto...">{{ producto.descripcion or '' }}</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="precio" class="form-label">Precio *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="precio" name="precio" 
+                                       min="0" step="100" required value="{{ producto.precio|int }}" placeholder="0">
+                            </div>
+                            <small class="form-text text-muted">Precio en pesos colombianos</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="categoria" class="form-label">Categoría *</label>
+                            <select class="form-control" id="categoria" name="categoria" required 
+                                    onchange="toggleNuevaCategoria()">
+                                <option value="">Seleccionar categoría...</option>
+                                {% for categoria in categorias %}
+                                    <option value="{{ categoria }}" {{ 'selected' if categoria == producto.categoria else '' }}>
+                                        {{ categoria }}
+                                    </option>
+                                {% endfor %}
+                                <option value="nueva">+ Nueva Categoría</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="nueva-categoria-div" style="display: none;">
+                        <label for="nueva_categoria" class="form-label">Nueva Categoría</label>
+                        <input type="text" class="form-control" id="nueva_categoria" name="nueva_categoria"
+                               placeholder="Ej: Postres, Bebidas Calientes, etc.">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="disponible" name="disponible" 
+                                   {{ 'checked' if producto.disponible else '' }}>
+                            <label class="form-check-label" for="disponible">
+                                <i class="bi bi-check-circle text-success"></i>
+                                Producto disponible para pedidos
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('ver_producto', id=producto.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="bi bi-check"></i> Actualizar Producto
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleNuevaCategoria() {
+    const categoriaSelect = document.getElementById('categoria');
+    const nuevaCategorialDiv = document.getElementById('nueva-categoria-div');
+    const nuevaCategoriaInput = document.getElementById('nueva_categoria');
+    
+    if (categoriaSelect.value === 'nueva') {
+        nuevaCategorialDiv.style.display = 'block';
+        nuevaCategoriaInput.required = true;
+        nuevaCategoriaInput.focus();
+    } else {
+        nuevaCategorialDiv.style.display = 'none';
+        nuevaCategoriaInput.required = false;
+        nuevaCategoriaInput.value = '';
+    }
+}
+
+// Validación del formulario
+document.querySelector('form').addEventListener('submit', function(e) {
+    const categoria = document.getElementById('categoria').value;
+    const nuevaCategoria = document.getElementById('nueva_categoria').value;
+    
+    if (categoria === 'nueva' && !nuevaCategoria.trim()) {
+        e.preventDefault();
+        alert('Por favor ingresa el nombre de la nueva categoría.');
+        document.getElementById('nueva_categoria').focus();
+    }
+});
+</script>
+{% endblock %}

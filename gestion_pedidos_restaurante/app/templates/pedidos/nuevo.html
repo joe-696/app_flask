@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Pedido - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-6 mb-4">
+            <i class="bi bi-plus-circle text-primary"></i> Nuevo Pedido
+        </h1>
+    </div>
+</div>
+
+<form method="POST" id="pedidoForm">
+    <div class="row">
+        <!-- Información del Cliente -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person"></i> Información del Cliente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="cliente_nombre" class="form-label">Nombre del Cliente *</label>
+                        <input type="text" class="form-control" id="cliente_nombre" name="cliente_nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cliente_telefono" class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" id="cliente_telefono" name="cliente_telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label for="mesa" class="form-label">Mesa</label>
+                        <input type="text" class="form-control" id="mesa" name="mesa" placeholder="Ej: Mesa 5">
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3" 
+                                placeholder="Observaciones especiales del pedido..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Selección de Productos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-cart"></i> Productos del Pedido
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="productos-container">
+                        <!-- Los productos se agregarán aquí dinámicamente -->
+                    </div>
+                    <button type="button" class="btn btn-outline-success" id="agregarProducto">
+                        <i class="bi bi-plus"></i> Agregar Producto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total y botones -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">Total: $<span id="total-pedido">0</span></h4>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('lista_pedidos') }}" class="btn btn-secondary me-2">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check"></i> Crear Pedido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let contadorProductos = 0;
+const productos = {{ productos_json|tojson }};
+
+function agregarFilaProducto() {
+    contadorProductos++;
+    const container = document.getElementById('productos-container');
+    
+    const div = document.createElement('div');
+    div.className = 'producto-item border rounded p-3 mb-3';
+    div.setAttribute('data-id', contadorProductos);
+    
+    div.innerHTML = `
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <label class="form-label">Producto *</label>
+                <select class="form-control producto-select" name="producto_id" required onchange="actualizarPrecio(this)">
+                    <option value="">Seleccionar producto...</option>
+                    ${productos.map(p => `<option value="${p.id}" data-precio="${p.precio}">${p.nombre} - $${p.precio.toLocaleString()}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Cantidad *</label>
+                <input type="number" class="form-control cantidad-input" name="cantidad" min="1" value="1" required onchange="calcularTotal()">
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Precio</label>
+                <input type="text" class="form-control precio-display" readonly>
+            </div>
+            <div class="col-md-1 mb-2 d-flex align-items-end">
+                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarProducto(${contadorProductos})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <label class="form-label">Observaciones del producto</label>
+                <input type="text" class="form-control" name="observaciones_detalle" placeholder="Sin cebolla, extra queso, etc...">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(div);
+}
+
+function eliminarProducto(id) {
+    const elemento = document.querySelector(`[data-id="${id}"]`);
+    if (elemento) {
+        elemento.remove();
+        calcularTotal();
+    }
+}
+
+function actualizarPrecio(select) {
+    const precio = select.options[select.selectedIndex].getAttribute('data-precio');
+    const fila = select.closest('.producto-item');
+    const precioInput = fila.querySelector('.precio-display');
+    
+    if (precio) {
+        precioInput.value = '$' + parseFloat(precio).toLocaleString();
+    } else {
+        precioInput.value = '';
+    }
+    
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    const filas = document.querySelectorAll('.producto-item');
+    
+    filas.forEach(fila => {
+        const select = fila.querySelector('.producto-select');
+        const cantidadInput = fila.querySelector('.cantidad-input');
+        
+        if (select.value && cantidadInput.value) {
+            const precio = parseFloat(select.options[select.selectedIndex].getAttribute('data-precio') || 0);
+            const cantidad = parseInt(cantidadInput.value || 0);
+            total += precio * cantidad;
+        }
+    });
+    
+    document.getElementById('total-pedido').textContent = total.toLocaleString();
+}
+
+// Event listeners
+document.getElementById('agregarProducto').addEventListener('click', agregarFilaProducto);
+
+// Agregar primera fila automáticamente
+document.addEventListener('DOMContentLoaded', function() {
+    agregarFilaProducto();
+});
+
+// Validación del formulario
+document.getElementById('pedidoForm').addEventListener('submit', function(e) {
+    const filas = document.querySelectorAll('.producto-item');
+    let tieneProductos = false;
+    
+    filas.forEach(fila => {
+        const select = fila.querySelector('.producto-select');
+        const cantidad = fila.querySelector('.cantidad-input');
+        
+        if (select.value && cantidad.value) {
+            tieneProductos = true;
+        }
+    });
+    
+    if (!tieneProductos) {
+        e.preventDefault();
+        alert('Debe agregar al menos un producto al pedido.');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Menú - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 text-center mb-5">
+            <i class="bi bi-card-list text-success"></i>
+            Nuestro Menú
+        </h1>
+    </div>
+</div>
+
+{% if productos %}
+    <!-- Agrupar productos por categoría -->
+    {% set categorias_unicas = productos | map(attribute='categoria') | unique | list %}
+    
+    {% for categoria in categorias_unicas %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <h2 class="border-bottom border-3 border-primary pb-2 mb-4">
+                    <i class="bi bi-tag"></i> {{ categoria }}
+                </h2>
+            </div>
+            
+            {% for producto in productos %}
+                {% if producto.categoria == categoria %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 card-hover">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">{{ producto.nombre }}</h5>
+                            {% if producto.descripcion %}
+                                <p class="card-text text-muted">{{ producto.descripcion }}</p>
+                            {% endif %}
+                            <div class="mt-auto">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="h4 text-success mb-0">
+                                        ${{ "{:,.0f}".format(producto.precio) }}
+                                    </span>
+                                    {% if producto.disponible %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Disponible
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-x-circle"></i> No Disponible
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endfor %}
+    
+    <div class="row mt-5">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-cart-plus"></i> Hacer Pedido
+            </a>
+        </div>
+    </div>
+    
+{% else %}
+    <div class="row">
+        <div class="col-12 text-center">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                No hay productos disponibles en el menú actualmente.
+            </div>
+            <a href="{{ url_for('nuevo_producto') }}" class="btn btn-success">
+                <i class="bi bi-plus"></i> Agregar Primer Producto
+            </a>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}

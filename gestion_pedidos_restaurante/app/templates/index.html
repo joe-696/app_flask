@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-4 text-center mb-5">
+            <i class="bi bi-shop text-primary"></i>
+            Bienvenido al Sistema de Gestión de Pedidos
+        </h1>
+    </div>
+</div>
+
+<!-- Estadísticas rápidas -->
+<div class="row mb-5">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary card-hover">
+            <div class="card-body text-center">
+                <i class="bi bi-receipt display-4"></i>
+                <h4 class="card-title mt-3">{{ total_pedidos }}</h4>
+                <p class="card-text">Total de Pedidos</p>
+                <a href="{{ url_for('lista_pedidos') }}" class="btn btn-light btn-sm">Ver Pedidos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success card-hover">
+            <div class="card-body text-center">
+                <i class="bi bi-box display-4"></i>
+                <h4 class="card-title mt-3">{{ total_productos }}</h4>
+                <p class="card-text">Productos en Menú</p>
+                <a href="{{ url_for('lista_productos') }}" class="btn btn-light btn-sm">Ver Productos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info card-hover">
+            <div class="card-body text-center">
+                <i class="bi bi-card-list display-4"></i>
+                <h4 class="card-title mt-3">Menú Completo</h4>
+                <p class="card-text">Ver Carta</p>
+                <a href="{{ url_for('menu') }}" class="btn btn-light btn-sm">Ver Menú</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Acciones rápidas -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="mb-4">
+            <i class="bi bi-lightning"></i> Acciones Rápidas
+        </h3>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card card-hover">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-plus-circle text-primary"></i> Nuevo Pedido
+                </h5>
+                <p class="card-text">Crear un nuevo pedido para un cliente</p>
+                <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary">
+                    <i class="bi bi-plus"></i> Crear Pedido
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card card-hover">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-plus-square text-success"></i> Nuevo Producto
+                </h5>
+                <p class="card-text">Agregar un nuevo producto al menú</p>
+                <a href="{{ url_for('nuevo_producto') }}" class="btn btn-success">
+                    <i class="bi bi-plus"></i> Agregar Producto
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pedidos recientes -->
+{% if pedidos_recientes %}
+<div class="row">
+    <div class="col-12">
+        <h3 class="mb-4">
+            <i class="bi bi-clock-history"></i> Pedidos Recientes
+        </h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Mesa</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos_recientes %}
+                    <tr>
+                        <td><strong>#{{ pedido.id }}</strong></td>
+                        <td>{{ pedido.cliente_nombre }}</td>
+                        <td>
+                            {% if pedido.mesa %}
+                                <i class="bi bi-table"></i> {{ pedido.mesa }}
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pedido.estado == 'pendiente' %}
+                                <span class="badge bg-warning estado-badge">
+                                    <i class="bi bi-clock"></i> Pendiente
+                                </span>
+                            {% elif pedido.estado == 'preparando' %}
+                                <span class="badge bg-info estado-badge">
+                                    <i class="bi bi-arrow-repeat"></i> Preparando
+                                </span>
+                            {% elif pedido.estado == 'listo' %}
+                                <span class="badge bg-success estado-badge">
+                                    <i class="bi bi-check-circle"></i> Listo
+                                </span>
+                            {% elif pedido.estado == 'entregado' %}
+                                <span class="badge bg-secondary estado-badge">
+                                    <i class="bi bi-check2-all"></i> Entregado
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger estado-badge">
+                                    <i class="bi bi-x-circle"></i> Cancelado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td><strong>${{ "{:,.0f}".format(pedido.total) }}</strong></td>
+                        <td>{{ pedido.fecha.strftime('%d/%m %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('ver_pedido', id=pedido.id) }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('lista_pedidos') }}" class="btn btn-outline-primary">
+                Ver Todos los Pedidos <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

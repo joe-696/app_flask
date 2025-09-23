@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Productos - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6">
+                <i class="bi bi-box text-success"></i> Lista de Productos
+            </h1>
+            <a href="{{ url_for('nuevo_producto') }}" class="btn btn-success">
+                <i class="bi bi-plus"></i> Nuevo Producto
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Buscar por nombre:</label>
+                        <input type="text" class="form-control" name="buscar" value="{{ buscar }}" 
+                               placeholder="Nombre del producto...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Filtrar por categoría:</label>
+                        <select class="form-control" name="categoria">
+                            <option value="todos" {{ 'selected' if categoria_filtro == 'todos' else '' }}>
+                                Todas las categorías
+                            </option>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria }}" {{ 'selected' if categoria_filtro == categoria else '' }}>
+                                    {{ categoria }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-search"></i> Buscar
+                        </button>
+                        <a href="{{ url_for('lista_productos') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x"></i> Limpiar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if productos %}
+<!-- Lista de productos -->
+<div class="row">
+    {% for producto in productos %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 card-hover">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="badge bg-secondary">{{ producto.categoria }}</span>
+                {% if producto.disponible %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle"></i> Disponible
+                    </span>
+                {% else %}
+                    <span class="badge bg-danger">
+                        <i class="bi bi-x-circle"></i> No Disponible
+                    </span>
+                {% endif %}
+            </div>
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ producto.nombre }}</h5>
+                
+                {% if producto.descripcion %}
+                <p class="card-text text-muted">{{ producto.descripcion }}</p>
+                {% endif %}
+                
+                <div class="mt-auto">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="h4 text-success mb-0">
+                            ${{ "{:,.0f}".format(producto.precio) }}
+                        </span>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar"></i> 
+                            {{ producto.fecha_creacion.strftime('%d/%m/%Y') }}
+                        </small>
+                    </div>
+                    
+                    <div class="btn-group w-100" role="group">
+                        <a href="{{ url_for('ver_producto', id=producto.id) }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                        <a href="{{ url_for('editar_producto', id=producto.id) }}" 
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        <form method="POST" action="{{ url_for('toggle_disponibilidad', id=producto.id) }}" 
+                              class="d-inline">
+                            <button type="submit" class="btn btn-outline-{{ 'warning' if producto.disponible else 'success' }} btn-sm">
+                                {% if producto.disponible %}
+                                    <i class="bi bi-eye-slash"></i>
+                                {% else %}
+                                    <i class="bi bi-eye"></i>
+                                {% endif %}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- Sin productos -->
+<div class="row">
+    <div class="col-12 text-center">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            No hay productos
+            {% if categoria_filtro != 'todos' or buscar %}
+                que coincidan con los filtros aplicados
+            {% endif %}
+            para mostrar.
+        </div>
+        
+        {% if categoria_filtro != 'todos' or buscar %}
+            <a href="{{ url_for('lista_productos') }}" class="btn btn-outline-primary me-2">
+                <i class="bi bi-arrow-left"></i> Ver Todos los Productos
+            </a>
+        {% endif %}
+        
+        <a href="{{ url_for('nuevo_producto') }}" class="btn btn-success">
+            <i class="bi bi-plus"></i> Crear Primer Producto
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Resumen por categorías -->
+{% if productos and categorias %}
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart"></i> Resumen por Categorías
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for categoria in categorias %}
+                        {% set productos_categoria = productos|selectattr("categoria", "equalto", categoria)|list %}
+                        {% set disponibles = productos_categoria|selectattr("disponible", "equalto", true)|list|length %}
+                        {% set total_categoria = productos_categoria|length %}
+                        
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <h6>{{ categoria }}</h6>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ (disponibles/total_categoria*100) if total_categoria > 0 else 0 }}%">
+                                        {{ disponibles }}/{{ total_categoria }}
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    {{ disponibles }} disponibles de {{ total_categoria }} productos
+                                </small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

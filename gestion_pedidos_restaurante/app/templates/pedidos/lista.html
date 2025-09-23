@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Pedidos - Restaurante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6">
+                <i class="bi bi-receipt text-primary"></i> Lista de Pedidos
+                {% if estado_filtro != 'todos' %}
+                    - {{ estado_filtro.title() }}
+                {% endif %}
+            </h1>
+            <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary">
+                <i class="bi bi-plus"></i> Nuevo Pedido
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title">Filtrar por estado:</h6>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('lista_pedidos') }}" 
+                       class="btn btn-sm {{ 'btn-primary' if estado_filtro == 'todos' else 'btn-outline-primary' }}">
+                        Todos
+                    </a>
+                    <a href="{{ url_for('lista_pedidos', estado='pendiente') }}" 
+                       class="btn btn-sm {{ 'btn-warning' if estado_filtro == 'pendiente' else 'btn-outline-warning' }}">
+                        Pendientes
+                    </a>
+                    <a href="{{ url_for('lista_pedidos', estado='preparando') }}" 
+                       class="btn btn-sm {{ 'btn-info' if estado_filtro == 'preparando' else 'btn-outline-info' }}">
+                        Preparando
+                    </a>
+                    <a href="{{ url_for('lista_pedidos', estado='listo') }}" 
+                       class="btn btn-sm {{ 'btn-success' if estado_filtro == 'listo' else 'btn-outline-success' }}">
+                        Listos
+                    </a>
+                    <a href="{{ url_for('lista_pedidos', estado='entregado') }}" 
+                       class="btn btn-sm {{ 'btn-secondary' if estado_filtro == 'entregado' else 'btn-outline-secondary' }}">
+                        Entregados
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if pedidos.items %}
+<!-- Tabla de pedidos -->
+<div class="row">
+    <div class="col-12">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Mesa</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos.items %}
+                    <tr>
+                        <td><strong>#{{ pedido.id }}</strong></td>
+                        <td>
+                            <div>
+                                <strong>{{ pedido.cliente_nombre }}</strong>
+                                {% if pedido.cliente_telefono %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-telephone"></i> {{ pedido.cliente_telefono }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if pedido.mesa %}
+                                <span class="badge bg-light text-dark">
+                                    <i class="bi bi-table"></i> {{ pedido.mesa }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pedido.estado == 'pendiente' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-clock"></i> Pendiente
+                                </span>
+                            {% elif pedido.estado == 'preparando' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-arrow-repeat"></i> Preparando
+                                </span>
+                            {% elif pedido.estado == 'listo' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Listo
+                                </span>
+                            {% elif pedido.estado == 'entregado' %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-check2-all"></i> Entregado
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-x-circle"></i> Cancelado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td><strong>${{ "{:,.0f}".format(pedido.total) }}</strong></td>
+                        <td>
+                            <small>
+                                {{ pedido.fecha.strftime('%d/%m/%Y') }}<br>
+                                {{ pedido.fecha.strftime('%H:%M') }}
+                            </small>
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('ver_pedido', id=pedido.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Ver detalles">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if pedido.estado not in ['entregado', 'cancelado'] %}
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                            type="button" data-bs-toggle="dropdown" title="Cambiar estado">
+                                        <i class="bi bi-gear"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        {% if pedido.estado != 'preparando' %}
+                                        <li>
+                                            <form method="POST" action="{{ url_for('cambiar_estado', id=pedido.id) }}" class="d-inline">
+                                                <input type="hidden" name="estado" value="preparando">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="bi bi-arrow-repeat text-info"></i> Preparando
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        {% if pedido.estado != 'listo' %}
+                                        <li>
+                                            <form method="POST" action="{{ url_for('cambiar_estado', id=pedido.id) }}" class="d-inline">
+                                                <input type="hidden" name="estado" value="listo">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="bi bi-check-circle text-success"></i> Listo
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        {% if pedido.estado != 'entregado' %}
+                                        <li>
+                                            <form method="POST" action="{{ url_for('cambiar_estado', id=pedido.id) }}" class="d-inline">
+                                                <input type="hidden" name="estado" value="entregado">
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="bi bi-check2-all text-secondary"></i> Entregado
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="POST" action="{{ url_for('cambiar_estado', id=pedido.id) }}" class="d-inline">
+                                                <input type="hidden" name="estado" value="cancelado">
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="bi bi-x-circle"></i> Cancelar
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Paginación -->
+{% if pedidos.pages > 1 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <nav aria-label="Navegación de pedidos">
+            <ul class="pagination justify-content-center">
+                {% if pedidos.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('lista_pedidos', page=pedidos.prev_num, estado=estado_filtro) }}">
+                            <i class="bi bi-chevron-left"></i> Anterior
+                        </a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in pedidos.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != pedidos.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('lista_pedidos', page=page_num, estado=estado_filtro) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pedidos.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('lista_pedidos', page=pedidos.next_num, estado=estado_filtro) }}">
+                            Siguiente <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Sin pedidos -->
+<div class="row">
+    <div class="col-12 text-center">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            No hay pedidos
+            {% if estado_filtro != 'todos' %}
+                en estado "{{ estado_filtro }}"
+            {% endif %}
+            para mostrar.
+        </div>
+        <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> Crear Primer Pedido
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
