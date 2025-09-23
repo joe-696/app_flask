@@ -32,7 +32,27 @@
                     </div>
                     <div class="mb-3">
                         <label for="mesa" class="form-label">Mesa</label>
-                        <input type="text" class="form-control" id="mesa" name="mesa" placeholder="Ej: Mesa 5">
+                        <select class="form-control" id="mesa" name="mesa">
+                            <option value="">Sin mesa asignada</option>
+                            {% for mesa in mesas %}
+                                <option value="{{ mesa.numero }}" 
+                                        {% if mesa.estado == 'ocupada' %}disabled class="text-muted"{% endif %}>
+                                    Mesa {{ mesa.numero }} 
+                                    ({{ mesa.capacidad }} personas) - 
+                                    {% if mesa.estado == 'disponible' %}
+                                        <span class="text-success">Disponible</span>
+                                    {% elif mesa.estado == 'ocupada' %}
+                                        <span class="text-danger">Ocupada</span>
+                                    {% elif mesa.estado == 'reservada' %}
+                                        <span class="text-warning">Reservada</span>
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 
+                            Las mesas ocupadas no están disponibles para nuevo pedido
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="observaciones" class="form-label">Observaciones</label>

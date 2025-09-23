@@ -396,15 +396,27 @@ def mesas():
     ocupadas = Mesa.query.filter_by(estado='ocupada', activa=True).count()
     reservadas = Mesa.query.filter_by(estado='reservada', activa=True).count()
     
-    # Agregar tiempo ocupada para mesas ocupadas
+    # Agregar información de pedidos actuales para mesas ocupadas
     for mesa in mesas:
         if mesa.estado == 'ocupada' and mesa.pedidos:
-            ultimo_pedido = mesa.pedidos[-1]  # Último pedido
-            tiempo_ocupada = datetime.now(timezone.utc) - ultimo_pedido.fecha
-            horas = int(tiempo_ocupada.total_seconds() // 3600)
-            minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
-            mesa.tiempo_ocupada = f"{horas}h {minutos}m"
+            # Buscar el pedido activo más reciente (no entregado ni cancelado)
+            pedido_actual = None
+            for pedido in reversed(mesa.pedidos):  # Empezar por el más reciente
+                if pedido.estado not in ['entregado', 'cancelado']:
+                    pedido_actual = pedido
+                    break
+            
+            if pedido_actual:
+                mesa.pedido_actual = pedido_actual
+                tiempo_ocupada = datetime.now(timezone.utc) - pedido_actual.fecha
+                horas = int(tiempo_ocupada.total_seconds() // 3600)
+                minutos = int((tiempo_ocupada.total_seconds() % 3600) // 60)
+                mesa.tiempo_ocupada = f"{horas}h {minutos}m"
+            else:
+                mesa.pedido_actual = None
+                mesa.tiempo_ocupada = "-"
         else:
+            mesa.pedido_actual = None
             mesa.tiempo_ocupada = "-"
     
     stats = {
@@ -691,20 +703,37 @@ def nuevo_pedido():
             # Obtener datos del formulario
             cliente_nombre = request.form.get('cliente_nombre')
             cliente_telefono = request.form.get('cliente_telefono')
-            mesa = request.form.get('mesa')
+            mesa_numero = request.form.get('mesa')
             observaciones = request.form.get('observaciones')
+            
+            # Buscar la mesa por número
+            mesa_obj = None
+            if mesa_numero:
+                mesa_obj = Mesa.query.filter_by(numero=mesa_numero, activa=True).first()
+                if mesa_obj and mesa_obj.estado == 'ocupada':
+                    flash(f'La mesa {mesa_numero} ya está ocupada', 'error')
+                    productos = Producto.query.filter_by(disponible=True).order_by(Producto.categoria, Producto.nombre).all()
+                    productos_dict = [producto.to_dict() for producto in productos]
+                    mesas = Mesa.query.filter_by(activa=True).all()
+                    return render_template('pedidos/nuevo.html', productos=productos, productos_json=productos_dict, mesas=mesas)
             
             # Crear el pedido
             pedido = Pedido(
                 cliente_nombre=cliente_nombre,
                 cliente_telefono=cliente_telefono,
-                mesa=mesa,
+                mesa_id=mesa_obj.id if mesa_obj else None,
+                mesa_numero=mesa_numero,  # Mantener compatibilidad
                 observaciones=observaciones,
-                estado='pendiente'
+                estado='pendiente',
+                usuario_id=current_user.id
             )
             
             db.session.add(pedido)
             db.session.flush()  # Para obtener el ID del pedido
+            
+            # Cambiar estado de la mesa a ocupada si existe
+            if mesa_obj:
+                mesa_obj.estado = 'ocupada'
             
             # Procesar productos seleccionados
             productos_ids = request.form.getlist('producto_id')
@@ -733,7 +762,7 @@ def nuevo_pedido():
             pedido.total = total_pedido
             db.session.commit()
             
-            flash(f'Pedido #{pedido.id} creado exitosamente', 'success')
+            flash(f'Pedido #{pedido.id} creado exitosamente. Mesa {mesa_numero} marcada como ocupada.', 'success')
             return redirect(url_for('ver_pedido', id=pedido.id))
             
         except Exception as e:
@@ -744,7 +773,9 @@ def nuevo_pedido():
     productos = Producto.query.filter_by(disponible=True).order_by(Producto.categoria, Producto.nombre).all()
     # Convertir productos a diccionarios para JSON
     productos_dict = [producto.to_dict() for producto in productos]
-    return render_template('pedidos/nuevo.html', productos=productos, productos_json=productos_dict)
+    # Obtener mesas disponibles
+    mesas = Mesa.query.filter_by(activa=True).all()
+    return render_template('pedidos/nuevo.html', productos=productos, productos_json=productos_dict, mesas=mesas)
 
 @app.route('/pedidos/<int:id>')
 def ver_pedido(id):
@@ -755,17 +786,30 @@ def ver_pedido(id):
 @app.route('/pedidos/<int:id>/cambiar_estado', methods=['POST'])
 def cambiar_estado(id):
     """Cambiar el estado de un pedido"""
-    pedido = Pedido.query.get_or_404(id)
-    nuevo_estado = request.form.get('estado')
-    
-    estados_validos = ['pendiente', 'preparando', 'listo', 'entregado', 'cancelado']
-    
-    if nuevo_estado in estados_validos:
-        pedido.estado = nuevo_estado
-        db.session.commit()
-        flash(f'Estado del pedido #{pedido.id} cambiado a {nuevo_estado}', 'success')
-    else:
-        flash('Estado no válido', 'error')
+    try:
+        pedido = Pedido.query.get_or_404(id)
+        nuevo_estado = request.form.get('estado')
+        
+        estados_validos = ['pendiente', 'preparando', 'listo', 'entregado', 'cancelado']
+        
+        if nuevo_estado in estados_validos:
+            estado_anterior = pedido.estado
+            pedido.estado = nuevo_estado
+            
+            # Si el pedido se entrega o cancela, liberar la mesa
+            if nuevo_estado in ['entregado', 'cancelado'] and pedido.mesa_info:
+                pedido.mesa_info.estado = 'disponible'
+                flash(f'Estado del pedido #{pedido.id} cambiado a {nuevo_estado}. Mesa {pedido.mesa_info.numero} liberada.', 'success')
+            else:
+                flash(f'Estado del pedido #{pedido.id} cambiado a {nuevo_estado}', 'success')
+                
+            db.session.commit()
+        else:
+            flash('Estado no válido', 'error')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cambiar estado: {str(e)}', 'error')
     
     return redirect(url_for('ver_pedido', id=id))
 
@@ -775,9 +819,15 @@ def eliminar_pedido(id):
     pedido = Pedido.query.get_or_404(id)
     
     try:
+        # Si el pedido tenía una mesa asignada, liberarla
+        if pedido.mesa_info:
+            pedido.mesa_info.estado = 'disponible'
+            flash(f'Pedido #{id} eliminado correctamente. Mesa {pedido.mesa_info.numero} liberada.', 'success')
+        else:
+            flash(f'Pedido #{id} eliminado correctamente', 'success')
+            
         db.session.delete(pedido)
         db.session.commit()
-        flash(f'Pedido #{id} eliminado correctamente', 'success')
         return redirect(url_for('lista_pedidos'))
     except Exception as e:
         db.session.rollback()

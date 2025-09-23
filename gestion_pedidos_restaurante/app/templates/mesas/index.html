@@ -122,17 +122,19 @@
                     <span class="badge bg-success fs-6">✅ Disponible</span>
                 {% elif mesa.estado == 'ocupada' %}
                     <span class="badge bg-warning fs-6">🍽️ Ocupada</span>
+                    {% if mesa.pedido_actual %}
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <strong>Pedido #{{ mesa.pedido_actual.id }}</strong><br>
+                            Cliente: {{ mesa.pedido_actual.cliente_nombre }}<br>
+                            Estado: <span class="badge bg-info">{{ mesa.pedido_actual.estado.title() }}</span><br>
+                            Total: S/{{ "%.2f"|format(mesa.pedido_actual.total) }}<br>
+                            Tiempo: {{ mesa.tiempo_ocupada }}
+                        </small>
+                    </div>
+                    {% endif %}
                 {% elif mesa.estado == 'reservada' %}
                     <span class="badge bg-danger fs-6">📋 Reservada</span>
-                {% endif %}
-                
-                {% if mesa.pedido_actual %}
-                <div class="mt-2">
-                    <small class="text-muted">
-                        Pedido #{{ mesa.pedido_actual.id }}<br>
-                        {{ mesa.pedido_actual.fecha_hora.strftime('%H:%M') }}
-                    </small>
-                </div>
                 {% endif %}
             </div>
             <div class="card-footer">
