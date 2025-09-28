@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 import os
 import io
 
@@ -947,9 +947,11 @@ def index():
     
     # Estadísticas del día actual
     hoy = date.today()
+    hoy_start = datetime.combine(hoy, datetime.min.time())
+    manana_start = hoy_start + timedelta(days=1)
     pedidos_hoy = Pedido.query.filter(
-        Pedido.fecha >= hoy,
-        Pedido.fecha < hoy.replace(day=hoy.day + 1) if hoy.day < 28 else hoy.replace(month=hoy.month + 1, day=1)
+        Pedido.fecha >= hoy_start,
+        Pedido.fecha < manana_start
     ).count()
     
     # Pedidos recientes según el rol

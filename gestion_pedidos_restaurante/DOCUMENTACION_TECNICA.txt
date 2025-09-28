@@ -1,0 +1,428 @@
+
+================
+
+El Sistema de Gestion de Pedidos de Restaurante es una aplicacion web desarrollada en Flask que permite
+la administracion completa de un restaurante, incluyendo gestion de usuarios, mesas, productos, pedidos
+y reportes. El sistema implementa un control de acceso basado en roles con tres tipos de usuario:
+administradores, meseros y cocineros.
+
+
+ARQUITECTURA DEL SISTEMA
+========================
+
+Patron de Arquitectura: MVC (Model-View-Controller)
+Framework Principal: Flask 2.3.3
+Base de Datos: SQLite con SQLAlchemy ORM
+Frontend: HTML5, CSS3, Bootstrap 5, JavaScript
+Autenticacion: Flask-Login 0.6.3
+Exportacion: OpenPyXL, ReportLab, Matplotlib
+
+Estructura de Directorios:
+- gestion_pedidos_restaurante/
+  - app.py (Aplicacion principal)
+  - restaurante.db (Base de datos SQLite)
+  - app/
+    - templates/ (Plantillas HTML)
+      - base.html (Plantilla base)
+      - auth/ (Autenticacion)
+      - dashboard/ (Paneles principales)
+      - empleados/ (Gestion de empleados)
+      - mesas/ (Gestion de mesas)
+      - pedidos/ (Gestion de pedidos)
+      - productos/ (Gestion de productos)
+      - reportes/ (Reportes y estadisticas)
+    - static/ (Archivos estaticos)
+      - css/
+      - js/
+      - img/
+
+
+MODELOS DE DATOS
+================
+
+Usuario (Tabla: usuarios)
+------------------------
+- id: Integer, clave primaria
+- username: String(80), unico, no nulo
+- password: String(120), no nulo
+- nombre_completo: String(120), no nulo
+- rol: String(20), no nulo (admin, mesero, cocinero)
+- activo: Boolean, por defecto True
+- fecha_creacion: DateTime, por defecto actual
+
+Mesa (Tabla: mesas)
+-------------------
+- id: Integer, clave primaria
+- numero: Integer, unico, no nulo
+- capacidad: Integer, no nulo
+- estado: String(20), no nulo (disponible, ocupada, reservada)
+- descripcion: Text, opcional
+- fecha_creacion: DateTime, por defecto actual
+
+Producto (Tabla: productos)
+---------------------------
+- id: Integer, clave primaria
+- nombre: String(100), no nulo
+- descripcion: Text, opcional
+- precio: Numeric(10,2), no nulo
+- categoria: String(50), no nulo
+- disponible: Boolean, por defecto True
+- imagen_url: String(200), opcional
+- fecha_creacion: DateTime, por defecto actual
+
+Pedido (Tabla: pedidos)
+-----------------------
+- id: Integer, clave primaria
+- mesa_id: Integer, clave foranea a mesas
+- usuario_id: Integer, clave foranea a usuarios
+- estado: String(20), no nulo (pendiente, preparando, listo, entregado, cancelado)
+- total: Numeric(10,2), por defecto 0.0
+- observaciones: Text, opcional
+- fecha_creacion: DateTime, por defecto actual
+- fecha_actualizacion: DateTime, actualizable
+
+DetallePedido (Tabla: detalle_pedidos)
+--------------------------------------
+- id: Integer, clave primaria
+- pedido_id: Integer, clave foranea a pedidos
+- producto_id: Integer, clave foranea a productos
+- cantidad: Integer, no nulo
+- precio_unitario: Numeric(10,2), no nulo
+- subtotal: Numeric(10,2), no nulo
+- observaciones: String(200), opcional
+
+
+RELACIONES ENTRE MODELOS
+========================
+
+Usuario -> Pedido: Relacion uno a muchos (un usuario puede crear multiples pedidos)
+Mesa -> Pedido: Relacion uno a muchos (una mesa puede tener multiples pedidos historicos)
+Pedido -> DetallePedido: Relacion uno a muchos (un pedido contiene multiples productos)
+Producto -> DetallePedido: Relacion uno a muchos (un producto puede estar en multiples pedidos)
+
+
+RUTAS Y FUNCIONALIDADES
+=======================
+
+Autenticacion
+-------------
+GET /login - Mostrar formulario de login
+POST /login - Procesar login de usuario
+GET /logout - Cerrar sesion de usuario
+GET /register - Mostrar formulario de registro (solo admins)
+POST /register - Procesar registro de nuevo usuario
+
+Dashboard Principal
+-------------------
+GET / - Pagina principal con estadisticas generales
+GET /dashboard_cocinero - Panel especializado para cocineros
+
+Gestion de Usuarios/Empleados
+-----------------------------
+GET /empleados - Listar todos los empleados
+POST /empleados/nuevo - Crear nuevo empleado
+GET /empleados/<id>/editar - Mostrar formulario de edicion
+POST /empleados/<id>/editar - Actualizar empleado
+POST /empleados/<id>/eliminar - Eliminar empleado
+POST /empleados/<id>/toggle_activo - Activar/desactivar empleado
+
+Gestion de Mesas
+----------------
+GET /mesas - Listar todas las mesas con estados
+POST /mesas/nueva - Crear nueva mesa
+GET /mesas/<id>/editar - Mostrar formulario de edicion
+POST /mesas/<id>/editar - Actualizar mesa
+POST /mesas/<id>/eliminar - Eliminar mesa
+POST /mesas/<id>/cambiar_estado - Cambiar estado de mesa
+
+Gestion de Productos
+--------------------
+GET /productos - Listar todos los productos
+POST /productos/nuevo - Crear nuevo producto
+GET /productos/<id>/editar - Mostrar formulario de edicion
+POST /productos/<id>/editar - Actualizar producto
+POST /productos/<id>/eliminar - Eliminar producto
+GET /menu - Vista publica del menu
+
+Gestion de Pedidos
+------------------
+GET /pedidos/ - Listar pedidos (filtrados por rol)
+GET /pedidos/nuevo - Mostrar formulario de nuevo pedido
+POST /pedidos/nuevo - Crear nuevo pedido
+GET /pedidos/<id> - Ver detalles de pedido
+POST /pedidos/<id>/cambiar_estado - Cambiar estado de pedido
+POST /pedidos/<id>/eliminar - Eliminar pedido
+
+Reportes y Exportacion
+----------------------
+GET /reportes - Dashboard de reportes con metricas
+GET /exportar_reporte - Generar y descargar reporte en Excel
+GET /exportar_reporte_pdf - Generar y descargar reporte en PDF
+
+
+SISTEMA DE ROLES Y PERMISOS
+===========================
+
+Administrador (admin)
+--------------------
+- Acceso completo a todas las funcionalidades
+- Gestion de empleados
+- Acceso a reportes y estadisticas
+- Configuracion del sistema
+- Exportacion de datos
+
+Mesero (mesero)
+---------------
+- Gestion de mesas (ver estados, cambiar estados)
+- Crear y gestionar pedidos
+- Ver productos y menu
+- Ver sus propios pedidos
+- Acceso limitado a reportes
+
+Cocinero (cocinero)
+-------------------
+- Ver pedidos pendientes y en preparacion
+- Cambiar estados de pedidos (pendiente -> preparando -> listo)
+- Ver menu y productos
+- Dashboard especializado para cocina
+- Sin acceso a gestion de mesas o empleados
+
+
+CONFIGURACION DEL SISTEMA
+=========================
+
+Variables de Configuracion (app.py)
+-----------------------------------
+SQLALCHEMY_DATABASE_URI: Ubicacion de la base de datos SQLite
+SQLALCHEMY_TRACK_MODIFICATIONS: Deshabilitado para mejor rendimiento
+SECRET_KEY: Clave secreta para sesiones y autenticacion
+
+Configuracion de Base de Datos
+------------------------------
+Esquema: SQLite con tablas normalizadas
+Indices: Creados automaticamente por SQLAlchemy en claves primarias y foraneas
+Integridad: Constrains de integridad referencial activos
+
+Configuracion de Sesiones
+-------------------------
+Duracion: Sesion persistente hasta logout explicito
+Seguridad: Tokens seguros generados por Flask-Login
+Cookies: HTTPOnly habilitado para seguridad
+
+
+DEPENDENCIAS EXTERNAS
+=====================
+
+Dependencias de Python
+----------------------
+Flask==2.3.3 - Framework web principal
+Flask-SQLAlchemy==3.0.5 - ORM para base de datos
+Flask-Login==0.6.3 - Manejo de autenticacion
+openpyxl==3.1.5 - Exportacion a Excel
+reportlab==4.4.4 - Generacion de PDFs
+matplotlib==3.10.6 - Graficos y charts
+
+Dependencias de Frontend
+------------------------
+Bootstrap 5.3.0 - Framework CSS
+Bootstrap Icons 1.10.0 - Iconos
+Chart.js 3.9.1 - Graficos interactivos
+jQuery 3.6.0 - Manipulacion DOM
+
+
+INSTALACION Y DESPLIEGUE
+========================
+
+Requisitos del Sistema
+----------------------
+Python 3.8 o superior
+Sistema operativo: Windows, Linux, macOS
+Memoria RAM: Minimo 512MB
+Espacio en disco: 100MB libres
+
+Proceso de Instalacion
+---------------------
+1. Clonar o descargar el codigo fuente
+2. Crear entorno virtual de Python
+3. Instalar dependencias con pip install -r requirements.txt
+4. Ejecutar python app.py para iniciar el servidor
+5. Acceder via navegador web a http://localhost:5000
+
+Configuracion Inicial
+--------------------
+El sistema crea automaticamente:
+- Base de datos con esquema completo
+- Usuario administrador por defecto (admin/admin123)
+- Datos de ejemplo para testing
+- Mesas numeradas del 1 al 12
+- Productos de ejemplo por categoria
+
+
+SEGURIDAD
+=========
+
+Autenticacion y Autorizacion
+----------------------------
+- Passwords hasheados con Werkzeug Security
+- Control de acceso basado en roles
+- Validacion de permisos en cada ruta
+- Proteccion CSRF en formularios
+
+Validacion de Datos
+-------------------
+- Validacion en el frontend con JavaScript
+- Validacion en el backend con Flask-WTF
+- Sanitizacion de inputs de usuario
+- Validacion de tipos de datos
+
+Proteccion contra Ataques
+-------------------------
+- Escape automatico de HTML en templates
+- Proteccion contra SQL Injection via ORM
+- Headers de seguridad HTTP
+- Limitacion de intentos de login
+
+
+MONITOREO Y LOGS
+================
+
+Sistema de Logging
+------------------
+El sistema registra:
+- Errores de aplicacion con stack traces completos
+- Accesos HTTP con codigos de respuesta
+- Operaciones de base de datos criticas
+- Cambios de estado de pedidos y mesas
+
+Metricas de Performance
+----------------------
+- Tiempo de respuesta de consultas SQL
+- Numero de usuarios concurrentes
+- Uso de memoria y CPU
+- Estadisticas de pedidos por periodo
+
+
+MANTENIMIENTO
+=============
+
+Backup de Datos
+---------------
+- Backup automatico de restaurante.db
+- Exportacion regular de datos a Excel/PDF
+- Versionado de esquema de base de datos
+
+Actualizaciones
+--------------
+- Migraciones de base de datos con SQLAlchemy
+- Actualizacion de dependencias via pip
+- Versionado semantico del codigo
+
+Optimizacion
+------------
+- Indices en consultas frecuentes
+- Cache de consultas repetitivas
+- Compresion de respuestas HTTP
+- Minificacion de assets estaticos
+
+
+SOLUCION DE PROBLEMAS
+====================
+
+Errores Comunes
+---------------
+1. Error de conexion a base de datos
+   Solucion: Verificar permisos de archivo restaurante.db
+
+2. Error de importacion de modulos
+   Solucion: Reinstalar dependencias con pip install -r requirements.txt
+
+3. Error de autenticacion
+   Solucion: Limpiar cookies del navegador y reiniciar sesion
+
+4. Error en exportacion de reportes
+   Solucion: Verificar instalacion de openpyxl y reportlab
+
+Logs de Error
+------------
+Los errores se registran en:
+- Consola del servidor Flask
+- Logs del navegador web (JavaScript)
+- Sistema de logs del servidor web
+
+Diagnostico
+-----------
+Para diagnosticar problemas:
+1. Revisar logs de error en consola
+2. Verificar estado de base de datos
+3. Comprobar conectividad de red
+4. Validar permisos de archivos
+
+
+ROADMAP Y MEJORAS FUTURAS
+=========================
+
+Funcionalidades Planeadas
+-------------------------
+- Integracion con sistemas de pago
+- Notificaciones push en tiempo real
+- API REST para integraciones externas
+- Aplicacion movil nativa
+- Sistema de inventario avanzado
+
+Mejoras de Performance
+---------------------
+- Migracion a PostgreSQL para mayor escalabilidad
+- Implementacion de Redis para cache
+- Optimizacion de consultas SQL complejas
+- Load balancing para alta disponibilidad
+
+Mejoras de UX
+------------
+- Interface responsive mejorada
+- Modo oscuro/claro
+- Personalizacion de dashboard
+- Atajos de teclado
+- Interfaz tactil optimizada
+
+
+GLOSARIO TECNICO
+===============
+
+ORM: Object-Relational Mapping - Mapeo objeto-relacional
+CRUD: Create, Read, Update, Delete - Operaciones basicas de base de datos
+MVC: Model-View-Controller - Patron de arquitectura de software
+JWT: JSON Web Token - Token de autenticacion
+CSRF: Cross-Site Request Forgery - Falsificacion de peticion cruzada
+SQL: Structured Query Language - Lenguaje de consulta estructurado
+REST: Representational State Transfer - Arquitectura de servicios web
+WSGI: Web Server Gateway Interface - Interfaz de servidor web
+
+
+CONTACTO Y SOPORTE
+==================
+
+Para soporte tecnico y consultas:
+- Revisar documentacion en codigo fuente
+- Consultar logs de error del sistema
+- Verificar dependencias y versiones
+- Comprobar configuracion de entorno
+
+
+LICENCIA Y DERECHOS
+==================
+
+Este sistema es desarrollado para uso educativo y comercial.
+Todos los derechos reservados.
+Version: 1.0 - Septiembre 2025
+
+
+FIN DE DOCUMENTO
+===============
+
+Total de lineas de codigo: Aproximadamente 1500
+Archivos principales: 1 (app.py)
+Templates HTML: 25 archivos
+Modelos de datos: 5 entidades
+Rutas implementadas: 30+ endpoints
+Tiempo estimado de desarrollo: 40 horas
+Nivel de complejidad: Intermedio-Avanzado

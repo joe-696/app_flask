@@ -1,0 +1,184 @@
+INFORME DE ANÁLISIS Y PLAN DE MANTENIMIENTO DEL PROYECTO
+Sistema de Gestión de Pedidos para Restaurante
+
+Fecha: 28 de septiembre de 2025
+Autor: Análisis Automatizado
+
+================================================================================
+
+OBJETIVO GENERAL
+================================================================================
+
+Garantizar la operatividad, seguridad, continuidad y disponibilidad del software (SW) 
+mediante actividades planificadas de mantenimiento y mejora.
+
+================================================================================
+
+OBJETIVOS ESPECÍFICOS
+================================================================================
+
+- Prevenir errores, fallos y defectos en el código y base de datos.
+- Aumentar la seguridad del sistema mediante mejores prácticas de autenticación y validación.
+- Incrementar la satisfacción del cliente optimizando la interfaz de usuario y funcionalidades.
+- Reducir costos operativos mediante refactorización y eliminación de código redundante.
+- Optimizar el rendimiento de la aplicación para una mejor experiencia de usuario.
+- Mantener la documentación actualizada y precisa.
+
+================================================================================
+
+ANÁLISIS DE LA ESTRUCTURA DEL PROYECTO
+================================================================================
+
+TECNOLOGÍAS UTILIZADAS:
+- Framework: Flask 2.3.3
+- Base de Datos: SQLite con SQLAlchemy ORM
+- Autenticación: Flask-Login 0.6.3
+- Frontend: HTML5, CSS3, Bootstrap 5, JavaScript
+- Exportación: OpenPyXL (Excel), ReportLab (PDF), Matplotlib (gráficos)
+- Entorno: Python 3.13.6 en entorno virtual (venv)
+
+ESTRUCTURA DE DIRECTORIOS:
+gestion_pedidos_restaurante/
+├── app.py (Aplicación principal - 1,515 líneas)
+├── check_db.py (Script de verificación de BD)
+├── DOCUMENTACION_TECNICA.txt (Documentación detallada)
+├── README.md (Guía de instalación y uso)
+├── requirements.txt (Dependencias básicas)
+├── restaurante.db (Base de datos SQLite)
+└── app/
+    ├── __init__.py
+    ├── models/
+    │   └── models.py (Modelos obsoletos)
+    ├── pedidos/
+    │   └── routes.py (Rutas para gestión de pedidos)
+    ├── productos/
+    │   └── routes.py (Rutas para gestión de productos)
+    ├── static/
+    │   └── css/
+    └── templates/
+        ├── base.html
+        ├── index.html
+        ├── menu.html
+        ├── auth/
+        ├── empleados/
+        ├── mesas/
+        ├── pedidos/
+        ├── productos/
+        └── reportes/
+
+MODELOS DE DATOS:
+- Usuario: Gestión de usuarios con roles (admin, mesero, cocinero)
+- Mesa: Información de mesas del restaurante
+- Producto: Catálogo de productos con precios y categorías
+- Pedido: Pedidos con estados y detalles
+- DetallePedido: Ítems individuales de pedidos
+
+FUNCIONALIDADES PRINCIPALES:
+- Autenticación y control de acceso por roles
+- Gestión CRUD de productos, pedidos y mesas
+- Estados de pedido: pendiente, preparando, listo, entregado, cancelado
+- Reportes con exportación a Excel/PDF y gráficos
+- Interfaz responsive con dashboards diferenciados
+
+================================================================================
+
+MATRIZ DE INCIDENCIAS
+================================================================================
+
+Identificación de problemas y áreas de mejora, categorizados por tipo de mantenimiento:
+
+TIPO: CORRECTIVO (Corrección de errores y fallos)
+--------------------------------------------------
+1. Modelos duplicados: models.py contiene definiciones obsoletas que no se usan.
+   - Impacto: Confusión en el código, posible inconsistencia.
+   - Prioridad: Alta
+
+2. Dependencias faltantes en requirements.txt: openpyxl, reportlab, matplotlib no listadas.
+   - Impacto: Instalación incompleta, errores de importación.
+   - Prioridad: Alta
+
+3. Clave secreta hardcodeada en app.py.
+   - Impacto: Riesgo de seguridad.
+   - Prioridad: Alta
+
+TIPO: PREVENTIVO (Prevención de futuros problemas)
+--------------------------------------------------
+4. app.py demasiado largo (1,515 líneas): Monolítico, difícil de mantener.
+   - Impacto: Errores difíciles de depurar, baja escalabilidad.
+   - Prioridad: Media
+
+5. Falta de validación en formularios y entradas de usuario.
+   - Impacto: Posibles vulnerabilidades de inyección.
+   - Prioridad: Media
+
+TIPO: PERFECTIVO (Mejoras y optimizaciones)
+--------------------------------------------------
+6. Interfaz de usuario básica: Mejorar diseño con más componentes Bootstrap.
+   - Impacto: Mejor experiencia de usuario.
+   - Prioridad: Baja
+
+7. Rendimiento: Optimizar consultas a BD y carga de páginas.
+   - Impacto: Mayor velocidad en operaciones.
+   - Prioridad: Media
+
+TIPO: DOCUMENTAL (Actualización de documentación)
+--------------------------------------------------
+8. README.md incompleto: Falta descripción de todas las funcionalidades.
+   - Impacto: Dificultad para nuevos desarrolladores.
+   - Prioridad: Media
+
+9. Falta de comentarios en el código: Funciones sin docstrings.
+   - Impacto: Baja mantenibilidad.
+   - Prioridad: Baja
+
+================================================================================
+
+PLAN DE MANTENIMIENTO
+================================================================================
+
+ACTIVIDADES RECOMENDADAS:
+
+FASE 1: CORRECCIONES INMEDIATAS (Semanas 1-2)
+- Eliminar models.py redundante o consolidar modelos en app.py.
+- Actualizar requirements.txt con todas las dependencias.
+- Mover clave secreta a variables de entorno.
+
+FASE 2: REFACTORIZACIÓN (Semanas 3-6)
+- Dividir app.py en módulos: models.py, auth.py, routes/.
+- Agregar validación de formularios con WTForms.
+- Implementar logging para errores y auditoría.
+
+FASE 3: MEJORAS FUNCIONALES (Semanas 7-10)
+- Optimizar consultas SQL con joins eficientes.
+- Mejorar UI con componentes adicionales de Bootstrap.
+- Agregar tests unitarios con pytest.
+
+FASE 4: DOCUMENTACIÓN Y PRUEBAS (Semanas 11-12)
+- Completar README.md con ejemplos de uso.
+- Agregar docstrings a todas las funciones.
+- Ejecutar pruebas de carga y seguridad.
+
+PRESUPUESTO ESTIMADO: 40-60 horas de desarrollo.
+RECURSOS NECESARIOS: Desarrollador Python/Flask, acceso a repositorio.
+
+================================================================================
+
+SUSTENTACIÓN
+================================================================================
+
+Este plan se basa en el análisis del código fuente, documentación técnica y mejores 
+prácticas de desarrollo con Flask. Las incidencias identificadas afectan la seguridad, 
+mantenibilidad y escalabilidad del proyecto. La implementación secuencial asegura 
+una transición suave sin interrupciones en la operatividad.
+
+================================================================================
+
+CONCLUSIONES
+================================================================================
+
+El proyecto es funcional y bien estructurado en términos generales, pero requiere 
+mantenimiento preventivo y correctivo para evitar problemas futuros. Con las mejoras 
+propuestas, se garantizará la continuidad, seguridad y optimización del sistema, 
+incrementando la satisfacción del cliente y reduciendo costos a largo plazo.
+
+================================================================================
